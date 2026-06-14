@@ -1,4 +1,4 @@
-# Project Holomacs: Common Lisp Emacs Port
+# Holomacs: Common Lisp Emacs Port
 
 <p align="center">
   <img src="assets/hologram.gif" width="300" alt="Holomacs rotating hologram logo">
