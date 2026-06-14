@@ -1,7 +1,11 @@
 # Project Holomacs: Common Lisp Emacs Port
 
+<p align="center">
+  <img src="assets/hologram.gif" width="300" alt="Holomacs rotating hologram logo">
+</p>
+
 ## Vision
-To create a "Hollowed-out Emacs" (Holomacs) where the internal C core is replaced by a pure Common Lisp (SBCL) engine, while preserving the exact behavioral "hologram" of historical Emacs versions (specifically starting with GNU Emacs from 1991).
+A pure Common Lisp (SBCL) execution engine running side-by-side with historical GNU Emacs internals, matching its behavioral signature bit-for-bit while leaving the underlying magic shrouded in mystery.
 
 ---
 
