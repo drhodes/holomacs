@@ -233,7 +233,7 @@ dependencies = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "libspec", directory = "../libspec" }]
+requires-dist = [{ name = "libspec", editable = "../libspec" }]
 
 [[package]]
 name = "httpcore"
@@ -347,7 +347,7 @@ wheels = [
 [[package]]
 name = "libspec"
 version = "9.1.1"
-source = { directory = "../libspec" }
+source = { editable = "../libspec" }
 dependencies = [
     { name = "aiofiles" },
     { name = "click" },
