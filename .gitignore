@@ -25,5 +25,7 @@ debug_logs/
 
 # Editor / System files
 .DS_Store
+.gemini/
+.venv/
 *~
 \#*
