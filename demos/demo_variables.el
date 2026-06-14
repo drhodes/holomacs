@@ -1,0 +1,18 @@
+(setq x 10)
+(print x)
+(let ((x 20))
+  (print x)
+  (let* ((x 30)
+         (y (+ x 5)))
+    (print x)
+    (print y)))
+(print x)
+
+(set-buffer "*scratch*")
+(setq my-local 100)
+(make-local-variable 'my-local)
+(setq my-local 200)
+(print my-local)
+
+(set-buffer (get-buffer-create "other-buffer"))
+(print (boundp 'my-local))

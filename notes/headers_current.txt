@@ -1,0 +1,15 @@
+buffer.h
+commands.h
+config.h
+dispextern.h
+frame.h
+lisp.h
+machine.h
+m-intel386.h
+mocklisp.h
+s-linux.h
+s-usg5-3.h
+system.h
+termhooks.h
+uaf.h
+xterm.h

@@ -1,0 +1,30 @@
+# Compiled object files and libraries
+*.o
+*.a
+*.so
+*.gch
+
+# Executables
+emacs-archaeology/src/emacs_oracle
+
+# Generated makefiles
+emacs-archaeology/src/xmakefile
+
+# Debug and run-time logs
+emacs-archaeology/debug_logs/
+emacs-archaeology/$path
+
+# Python cache
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Common Lisp compiled files
+*.fasl
+
+# Editor / System files
+.DS_Store
+*~
+\#*

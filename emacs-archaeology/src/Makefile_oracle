@@ -1,0 +1,6 @@
+CFLAGS = -g -I. -std=gnu89 -fpermissive -w -fcommon -fno-pie
+OBJ = abbrev.o alloc.o buffer.o bytecode.o callproc.o casefiddle.o casetab.o cmds.o data.o dired.o doc.o doprnt.o editfns.o emacs.o eval.o fileio.o fns.o indent.o insdel.o keymap.o macros.o marker.o minibuf.o print.o syntax.o window.o lread.o search.o regex.o undo.o callint.o process.o sysdep.o dispnew.o scroll.o xdisp.o keyboard.o holomacs_stubs.o
+LIBS = -lncurses -lm -no-pie
+
+emacs_oracle: $(OBJ)
+	$(CC) -o emacs_oracle $(OBJ) $(LIBS)
