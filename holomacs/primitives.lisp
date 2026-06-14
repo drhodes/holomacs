@@ -81,6 +81,27 @@
                 (progn (write-char c out) (incf i)))))
     (get-output-stream-string out)))
 
+(defun adjust-markers-on-insert (buf pos len)
+  (dolist (m (buffer-markers buf))
+    (let ((mpos (marker-position m)))
+      (when mpos
+        (cond
+          ((> mpos pos)
+           (setf (marker-position m) (+ mpos len)))
+          ((= mpos pos)
+           (when (marker-insertion-type m)
+             (setf (marker-position m) (+ mpos len)))))))))
+
+(defun adjust-markers-on-delete (buf pos len)
+  (dolist (m (buffer-markers buf))
+    (let ((mpos (marker-position m)))
+      (when mpos
+        (cond
+          ((> mpos (+ pos len))
+           (setf (marker-position m) (- mpos len)))
+          ((>= mpos pos)
+           (setf (marker-position m) pos)))))))
+
 ;;;; =========================================================================
 ;;;; Primitive Registrations
 ;;;; =========================================================================
@@ -137,19 +158,23 @@
                     (lambda ()
                       (1+ (length (buffer-contents *current-buffer*)))))
 
-(register-primitive 'goto-char
-                    (lambda (pos)
-                      (let ((max-pos (1+ (length (buffer-contents *current-buffer*)))))
-                        (cond
-                          ((< pos 1) (setf (buffer-point *current-buffer*) 1))
-                          ((> pos max-pos) (setf (buffer-point *current-buffer*) max-pos))
-                          (t (setf (buffer-point *current-buffer*) pos)))
-                        (buffer-point *current-buffer*))))
+(defun elisp-goto-char (pos)
+  (let* ((resolved (resolve-position pos))
+         (max-pos (1+ (length (buffer-contents *current-buffer*)))))
+    (cond
+      ((< resolved 1) (setf (buffer-point *current-buffer*) 1))
+      ((> resolved max-pos) (setf (buffer-point *current-buffer*) max-pos))
+      (t (setf (buffer-point *current-buffer*) resolved)))
+    (buffer-point *current-buffer*)))
+
+(register-primitive 'goto-char #'elisp-goto-char)
 
 (register-primitive 'buffer-substring
                     (lambda (start end)
-                      (let ((contents (buffer-contents *current-buffer*)))
-                        (subseq contents (1- start) (1- end)))))
+                      (let ((contents (buffer-contents *current-buffer*))
+                            (s-pos (resolve-position start))
+                            (e-pos (resolve-position end)))
+                        (subseq contents (1- s-pos) (1- e-pos)))))
 
 (register-primitive 'insert
                     (lambda (&rest args)
@@ -167,11 +192,14 @@
                             ;; Shift elements to the right to make room
                             (loop for i from (1- new-total) downto (+ idx len) do
                                   (setf (aref contents i) (aref contents (- i len))))
-                            ;; Write new string chars
-                            (loop for i from 0 to (1- len) do
-                                  (setf (aref contents (+ idx i)) (char str i)))
-                            ;; Advance point
-                            (setf (buffer-point buf) (+ (buffer-point buf) len)))))))
+                            (let ((pos (buffer-point buf)))
+                              ;; Write new string chars
+                              (loop for i from 0 to (1- len) do
+                                    (setf (aref contents (+ idx i)) (char str i)))
+                              ;; Advance point
+                              (setf (buffer-point buf) (+ (buffer-point buf) len))
+                              ;; Adjust markers
+                              (adjust-markers-on-insert buf pos len)))))))
 
 ;; Printing & Formatting
 (register-primitive 'print
@@ -302,8 +330,10 @@
                       (declare (ignore visit lockname mustbenew))
                       (let ((str (if (stringp start)
                                      start
-                                     (let ((contents (buffer-contents *current-buffer*)))
-                                       (subseq contents (1- start) (1- end))))))
+                                     (let ((contents (buffer-contents *current-buffer*))
+                                           (s-pos (resolve-position start))
+                                           (e-pos (resolve-position end)))
+                                       (subseq contents (1- s-pos) (1- e-pos))))))
                         (with-open-file (stream filename
                                                :direction :output
                                                :if-exists (if append :append :supersede)
@@ -356,5 +386,220 @@
 (register-primitive 'use-global-map
                     (lambda (keymap)
                       (setf *global-map* keymap)
+                      nil))
+
+;;;; =========================================================================
+;;;; Markers & Buffer Editing Primitives
+;;;; =========================================================================
+
+(register-primitive 'make-marker
+                    (lambda ()
+                      (make-elisp-marker)))
+
+(register-primitive 'markerp
+                    (lambda (x)
+                      (if (elisp-marker-p x) 't nil)))
+
+(register-primitive 'integer-or-marker-p
+                    (lambda (x)
+                      (if (or (integerp x) (elisp-marker-p x)) 't nil)))
+
+(register-primitive 'number-or-marker-p
+                    (lambda (x)
+                      (if (or (numberp x) (elisp-marker-p x)) 't nil)))
+
+(register-primitive 'marker-position
+                    (lambda (m)
+                      (if (elisp-marker-p m)
+                          (marker-position m)
+                          (signal-elisp-error 'wrong-type-argument 'markerp m))))
+
+(register-primitive 'marker-buffer
+                    (lambda (m)
+                      (if (elisp-marker-p m)
+                          (marker-buffer m)
+                          (signal-elisp-error 'wrong-type-argument 'markerp m))))
+
+(register-primitive 'set-marker
+                    (lambda (m pos &optional buffer)
+                      (unless (elisp-marker-p m)
+                        (signal-elisp-error 'wrong-type-argument 'markerp m))
+                      (let ((buf (or buffer *current-buffer*)))
+                        (unless (elisp-buffer-p buf)
+                          (signal-elisp-error 'wrong-type-argument 'bufferp buf))
+                        (let ((old-buf (marker-buffer m)))
+                          (when old-buf
+                            (setf (buffer-markers old-buf) (delete m (buffer-markers old-buf)))))
+                        (if pos
+                            (let* ((resolved (resolve-position pos))
+                                   (max-pos (1+ (length (buffer-contents buf)))))
+                              (setf (marker-position m) (max 1 (min resolved max-pos)))
+                              (setf (marker-buffer m) buf)
+                              (push m (buffer-markers buf)))
+                            (progn
+                              (setf (marker-position m) nil)
+                              (setf (marker-buffer m) nil))))
+                      m))
+
+(register-primitive 'copy-marker
+                    (lambda (m)
+                      (cond
+                        ((elisp-marker-p m)
+                         (let ((new-m (make-elisp-marker
+                                       :buffer (marker-buffer m)
+                                       :position (marker-position m)
+                                       :insertion-type (marker-insertion-type m))))
+                           (when (marker-buffer m)
+                             (push new-m (buffer-markers (marker-buffer m))))
+                           new-m))
+                        ((integerp m)
+                         (let ((new-m (make-elisp-marker
+                                       :buffer *current-buffer*
+                                       :position m)))
+                           (push new-m (buffer-markers *current-buffer*))
+                           new-m))
+                        (t (signal-elisp-error 'wrong-type-argument 'integer-or-marker-p m)))))
+
+(register-primitive 'point-marker
+                    (lambda ()
+                      (let ((m (make-elisp-marker
+                                :buffer *current-buffer*
+                                :position (buffer-point *current-buffer*))))
+                        (push m (buffer-markers *current-buffer*))
+                        m)))
+
+(register-primitive 'point-min-marker
+                    (lambda ()
+                      (let ((m (make-elisp-marker
+                                :buffer *current-buffer*
+                                :position 1)))
+                        (push m (buffer-markers *current-buffer*))
+                        m)))
+
+(register-primitive 'point-max-marker
+                    (lambda ()
+                      (let ((m (make-elisp-marker
+                                :buffer *current-buffer*
+                                :position (1+ (length (buffer-contents *current-buffer*))))))
+                        (push m (buffer-markers *current-buffer*))
+                        m)))
+
+(defun delete-buffer-region (buf start end)
+  (let* ((s (resolve-position start))
+         (e (resolve-position end))
+         (s-idx (1- (min s e)))
+         (e-idx (1- (max s e)))
+         (len (- e-idx s-idx))
+         (contents (buffer-contents buf)))
+    (when (> len 0)
+      ;; Shift remaining elements left
+      (loop for i from s-idx to (- (length contents) len 1) do
+            (setf (aref contents i) (aref contents (+ i len))))
+      ;; Adjust fill pointer
+      (setf (fill-pointer contents) (- (length contents) len))
+      ;; Adjust point
+      (let ((pt (buffer-point buf)))
+        (cond
+          ((> pt (+ s-idx len)) (setf (buffer-point buf) (- pt len)))
+          ((>= pt (1+ s-idx)) (setf (buffer-point buf) (1+ s-idx)))))
+      ;; Adjust markers
+      (adjust-markers-on-delete buf (1+ s-idx) len))))
+
+(register-primitive 'delete-region
+                    (lambda (start end)
+                      (delete-buffer-region *current-buffer* start end)
+                      nil))
+
+(register-primitive 'delete-char
+                    (lambda (n &optional killflag)
+                      (declare (ignore killflag))
+                      (let* ((pt (buffer-point *current-buffer*))
+                             (max-pos (1+ (length (buffer-contents *current-buffer*)))))
+                        (if (> n 0)
+                            (let ((end (min (+ pt n) max-pos)))
+                              (delete-buffer-region *current-buffer* pt end))
+                            (let ((start (max (- pt (- n)) 1)))
+                              (delete-buffer-region *current-buffer* start pt))))
+                      nil))
+
+(register-primitive 'erase-buffer
+                    (lambda ()
+                      (delete-buffer-region *current-buffer* 1 (1+ (length (buffer-contents *current-buffer*))))
+                      nil))
+
+(register-primitive 'forward-char
+                    (lambda (&optional n)
+                      (let ((steps (or n 1)))
+                        (elisp-goto-char (+ (buffer-point *current-buffer*) steps)))
+                      nil))
+
+(register-primitive 'backward-char
+                    (lambda (&optional n)
+                      (let ((steps (or n 1)))
+                        (elisp-goto-char (- (buffer-point *current-buffer*) steps)))
+                      nil))
+
+(defun line-beginning-position ()
+  (let* ((contents (buffer-contents *current-buffer*))
+         (pt (buffer-point *current-buffer*))
+         (idx (1- pt)))
+    (loop for i from (1- idx) downto 0 do
+          (when (char= (aref contents i) #\Newline)
+            (return-from line-beginning-position (+ i 2))))
+    1))
+
+(register-primitive 'beginning-of-line
+                    (lambda (&optional n)
+                      (declare (ignore n))
+                      (elisp-goto-char (line-beginning-position))
+                      nil))
+
+(defun line-end-position ()
+  (let* ((contents (buffer-contents *current-buffer*))
+         (len (length contents))
+         (pt (buffer-point *current-buffer*))
+         (idx (1- pt)))
+    (loop for i from idx to (1- len) do
+          (when (char= (aref contents i) #\Newline)
+            (return-from line-end-position (1+ i))))
+    (1+ len)))
+
+(register-primitive 'end-of-line
+                    (lambda (&optional n)
+                      (declare (ignore n))
+                      (elisp-goto-char (line-end-position))
+                      nil))
+
+(defun get-line-starts ()
+  (let* ((contents (buffer-contents *current-buffer*))
+         (len (length contents))
+         (starts (list 1)))
+    (loop for i from 0 to (1- len) do
+          (when (char= (aref contents i) #\Newline)
+            (push (+ i 2) starts)))
+    (nreverse starts)))
+
+(defun current-line-index (starts pt)
+  (let ((idx 0))
+    (dolist (start (cdr starts))
+      (if (< pt start)
+          (return-from current-line-index idx)
+          (incf idx)))
+    idx))
+
+(register-primitive 'forward-line
+                    (lambda (&optional n)
+                      (let* ((count (or n 1))
+                             (starts (get-line-starts))
+                             (num-lines (length starts))
+                             (curr-idx (current-line-index starts (buffer-point *current-buffer*)))
+                             (target-idx (+ curr-idx count)))
+                        (cond
+                          ((< target-idx 0)
+                           (elisp-goto-char 1))
+                          ((>= target-idx num-lines)
+                           (elisp-goto-char (1+ (length (buffer-contents *current-buffer*)))))
+                          (t
+                           (elisp-goto-char (nth target-idx starts)))))
                       nil))
 

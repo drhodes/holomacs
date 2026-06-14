@@ -19,7 +19,33 @@
   name
   (contents (make-array 0 :element-type 'character :adjustable t :fill-pointer 0))
   (point 1)
-  (local-vars (make-hash-table :test 'eq)))
+  (local-vars (make-hash-table :test 'eq))
+  (markers nil))
+
+(defstruct (elisp-marker (:conc-name marker-)
+                         (:print-function print-elisp-marker))
+  buffer
+  position
+  (insertion-type nil))
+
+(defun print-elisp-marker (marker stream depth)
+  (declare (ignore depth))
+  (if (marker-buffer marker)
+      (format stream "#<marker at ~A in ~A>"
+              (marker-position marker)
+              (buffer-name (marker-buffer marker)))
+      (format stream "#<marker in no buffer>")))
+
+(defun resolve-position (pos)
+  (cond
+    ((integerp pos) pos)
+    ((elisp-marker-p pos)
+     (let ((buf (marker-buffer pos))
+           (mpos (marker-position pos)))
+       (if (and buf mpos)
+           mpos
+           (signal-elisp-error 'wrong-type-argument 'integer-or-marker-p pos))))
+    (t (signal-elisp-error 'wrong-type-argument 'integer-or-marker-p pos))))
 
 (defvar *buffers* nil)
 (defvar *current-buffer* nil)
