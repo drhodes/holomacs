@@ -11,8 +11,7 @@ emacs-archaeology/src/emacs_oracle
 emacs-archaeology/src/xmakefile
 
 # Debug and run-time logs
-emacs-archaeology/debug_logs/
-emacs-archaeology/$path
+debug_logs/
 
 # Python cache
 **/__pycache__/

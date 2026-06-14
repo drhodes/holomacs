@@ -9,4 +9,4 @@ run-demos:
 
 clean:
 	cd emacs-archaeology/src && rm -f *.o emacs_oracle
-	rm -rf emacs-archaeology/debug_logs
+	rm -rf debug_logs

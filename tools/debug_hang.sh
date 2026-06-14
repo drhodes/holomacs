@@ -4,9 +4,12 @@
 set -e
 
 # Target binary and arguments
-TARGET="./src/emacs_oracle"
+# Find target relative to the script location
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+TARGET="$ROOT_DIR/emacs-archaeology/src/emacs_oracle"
 ARGS="-batch -eval (message \"hello\")"
-LOG_DIR="debug_logs"
+LOG_DIR="$ROOT_DIR/debug_logs"
 
 mkdir -p "$LOG_DIR"
 echo "=== Starting Holomacs Hang Debugger ==="
