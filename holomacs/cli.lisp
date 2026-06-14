@@ -3,10 +3,10 @@
 (defun elisp-string-reader (stream char)
   (declare (ignore char))
   (let ((out (make-string-output-stream)))
-    (loop for c = (read-char stream t nil t)
+    (loop for c = (cl:read-char stream t nil t)
           until (char= c #\")
           do (if (char= c #\\)
-                 (let ((next (read-char stream t nil t)))
+                 (let ((next (cl:read-char stream t nil t)))
                    (case next
                      (#\n (write-char #\Newline out))
                      (#\t (write-char #\Tab out))
@@ -14,6 +14,30 @@
                      (t (write-char next out))))
                  (write-char c out)))
     (get-output-stream-string out)))
+
+(defun elisp-char-reader (stream char)
+  "Reader macro for Elisp ?x character literals. Returns the integer char code."
+  (declare (ignore char))
+  (let ((next (cl:read-char stream t nil t)))
+    (if (char= next #\\)
+        ;; Escape sequence: ?\n ?\t ?\r ?\\ etc.
+        (let ((escaped (cl:read-char stream t nil t)))
+          (char-code
+           (case escaped
+             (#\n #\Newline)
+             (#\t #\Tab)
+             (#\r #\Return)
+             (#\0 #\Null)
+             (t escaped))))
+        ;; Plain ?x → char-code of x
+        (char-code next))))
+
+(defun make-elisp-readtable ()
+  "Build a readtable with Elisp-specific reader macros."
+  (let ((rt (copy-readtable nil)))
+    (set-macro-character #\" #'elisp-string-reader nil rt)
+    (set-macro-character #\? #'elisp-char-reader nil rt)
+    rt))
 
 (defun run-file (filename)
   (init-elisp-state)
@@ -28,8 +52,7 @@
 (defun run-string (str)
   (init-elisp-state)
   (let ((*package* (find-package '#:holomacs))
-        (*readtable* (copy-readtable nil)))
-    (set-macro-character #\" #'elisp-string-reader)
+        (*readtable* (make-elisp-readtable)))
     (with-input-from-string (stream str)
       (handler-case
           (loop

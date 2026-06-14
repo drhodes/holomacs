@@ -67,10 +67,21 @@
          (defun
           (let* ((name (first args))
                  (params (second args))
-                 (body (cddr args)))
-            `(defun ,name ,params
-               (declare (special ,@params))
-               ,@(mapcar #'transpile-elisp body))))
+                 (body (cddr args))
+                 (first-form (first body))
+                 (is-interactive (and (consp first-form) (eq (car first-form) 'interactive)))
+                 (interactive-spec (when is-interactive (cdr first-form)))
+                 (real-body (if is-interactive (rest body) body)))
+            `(progn
+               (defun ,name ,params
+                 (declare (special ,@params))
+                 ,@(mapcar #'transpile-elisp real-body))
+               ,(when is-interactive
+                  `(setf (get ',name 'interactive)
+                         ,(if (null interactive-spec)
+                              :user-interactive
+                              (first interactive-spec))))
+               ',name)))
          (while
           `(loop while ,(transpile-elisp (first args))
                  do (progn ,@(mapcar #'transpile-elisp (rest args)))))
@@ -108,8 +119,7 @@
 (defun load-elisp-file (filename)
   "Load, transpile, and compile/execute an Elisp file."
   (let ((*package* (find-package '#:holomacs))
-        (*readtable* (copy-readtable nil)))
-    (set-macro-character #\" #'elisp-string-reader)
+        (*readtable* (make-elisp-readtable)))
     (with-open-file (stream filename :direction :input)
       (loop
         (let ((expr (read stream nil :eof)))

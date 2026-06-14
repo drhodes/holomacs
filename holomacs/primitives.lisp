@@ -226,6 +226,16 @@
                     (lambda (n)
                       (format nil "~D" n)))
 
+(register-primitive 'char-to-string
+                    (lambda (char-code)
+                      (string (code-char char-code))))
+
+(register-primitive 'string-to-char
+                    (lambda (str)
+                      (if (and (stringp str) (> (length str) 0))
+                          (char-code (char str 0))
+                          0)))
+
 (register-primitive 'string-equal
                     (lambda (s1 s2)
                       (if (string= (elisp-to-string s1) (elisp-to-string s2)) 't nil)))
@@ -444,10 +454,12 @@
                                 nil))
                           (error "Wrong type argument: keymapp"))))
 
-(defvar *global-map* nil)
+(defvar global-map nil)
+(declaim (special global-map))
+
 (register-primitive 'use-global-map
                     (lambda (keymap)
-                      (setf *global-map* keymap)
+                      (setq global-map keymap)
                       nil))
 
 ;;;; =========================================================================

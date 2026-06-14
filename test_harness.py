@@ -52,6 +52,13 @@ def run_test(el_path):
     with open(el_path, 'r') as f:
         original_content = f.read()
     
+    # Parse mock input if specified
+    mock_input = None
+    for line in original_content.splitlines():
+        if line.startswith(";; INPUT: "):
+            mock_input = line[len(";; INPUT: "):]
+            break
+
     # Create temp file with dump script appended
     with tempfile.NamedTemporaryFile(mode='w', suffix='.el', delete=False) as temp:
         temp.write(original_content)
@@ -65,13 +72,15 @@ def run_test(el_path):
         env = os.environ.copy()
         env["EMACSLOADPATH"] = os.path.dirname(temp_path)
         
+        stdin_kwargs = {"input": mock_input} if mock_input is not None else {"stdin": subprocess.DEVNULL}
+        
         oracle_proc = subprocess.run(
             [oracle_bin, "-batch", "-l", temp_path],
             env=env,
-            stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=True
+            text=True,
+            **stdin_kwargs
         )
         
         oracle_out = clean_oracle_output(oracle_proc.stdout + oracle_proc.stderr)
@@ -88,7 +97,8 @@ def run_test(el_path):
             cl_cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=True
+            text=True,
+            **stdin_kwargs
         )
         
         cl_out = clean_cl_output(cl_proc.stdout + cl_proc.stderr)

@@ -7,4 +7,5 @@
                (:file "core")
                (:file "transpiler")
                (:file "primitives")
+               (:file "command_loop")
                (:file "cli")))

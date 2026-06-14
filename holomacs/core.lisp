@@ -67,6 +67,7 @@
   ;; Initialize nil and t in global env
   (setf (gethash 'nil *global-env*) nil)
   (setf (gethash 't *global-env*) 't)
+  (setf (cl:symbol-value 'global-map) (list 'keymap))
   ;; Create initial scratch buffer
   (get-buffer-create "*scratch*")
   (set-buffer "*scratch*"))
