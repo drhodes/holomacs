@@ -17,18 +17,27 @@
 
 (defun run-file (filename)
   (init-elisp-state)
+  (handler-case
+      (load-elisp-file filename)
+    (error (err)
+      (format *error-output* "Error during execution: ~A~%" err)
+      (uiop:quit 1)))
+  ;; Print captured output to standard output
+  (write-string (get-output-stream-string *elisp-output*)))
+
+(defun run-string (str)
+  (init-elisp-state)
   (let ((*package* (find-package '#:holomacs))
         (*readtable* (copy-readtable nil)))
     (set-macro-character #\" #'elisp-string-reader)
-    (with-open-file (stream filename :direction :input)
+    (with-input-from-string (stream str)
       (handler-case
           (loop
             (let ((expr (read stream nil :eof)))
               (if (eq expr :eof)
                   (return)
-                  (eval-elisp expr))))
+                  (compile-elisp-form expr))))
         (error (err)
           (format *error-output* "Error during execution: ~A~%" err)
           (uiop:quit 1)))))
-  ;; Print captured output to standard output
   (write-string (get-output-stream-string *elisp-output*)))

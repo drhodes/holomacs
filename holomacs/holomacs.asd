@@ -5,5 +5,6 @@
   :serial t
   :components ((:file "package")
                (:file "core")
+               (:file "transpiler")
                (:file "primitives")
                (:file "cli")))

@@ -201,13 +201,13 @@
                               ;; Adjust markers
                               (adjust-markers-on-insert buf pos len)))))))
 
-;; Printing & Formatting
-(register-primitive 'print
-                    (lambda (obj &optional stream)
-                      (declare (ignore stream))
-                      (format *elisp-output* "~%~A~%" (elisp-to-string-readable obj))
-                      (setf *noninteractive-need-newline* t)
-                      obj))
+(defun print (obj &optional stream)
+  (declare (ignore stream))
+  (format *elisp-output* "~%~A~%" (elisp-to-string-readable obj))
+  (setf *noninteractive-need-newline* t)
+  obj)
+
+(register-primitive 'print #'print)
 
 (register-primitive 'message
                     (lambda (format-str &rest args)
@@ -249,11 +249,13 @@
                               (elisp-symbol-value var)))
                       var))
 
-(register-primitive 'boundp
-                    (lambda (var)
-                      (if (elisp-variable-boundp var)
-                          't
-                          nil)))
+(defun boundp (var)
+  (if (elisp-variable-boundp var)
+      't
+      nil))
+
+(register-primitive 'boundp #'boundp)
+
 
 ;;;; =========================================================================
 ;;;; New Primitives (Equality, Lists, Symbols, Control, I/O)
@@ -273,22 +275,53 @@
     (t nil)))
 
 ;; Equality
+(defun equal (x y)
+  (if (elisp-equal x y) 't nil))
+
 (register-primitive 'eq (lambda (x y) (if (eq x y) 't nil)))
-(register-primitive 'equal (lambda (x y) (if (elisp-equal x y) 't nil)))
+(register-primitive 'equal #'equal)
 
 ;; Lists
 (register-primitive 'cons #'cons)
 (register-primitive 'list #'list)
 (register-primitive 'vector (lambda (&rest args) (apply #'vector args)))
+
+(defun length (sequence)
+  (cond
+    ((listp sequence)
+     (let ((len 0))
+       (loop for cell = sequence then (cdr cell)
+             while (consp cell)
+             do (incf len)
+             finally (if (null cell)
+                         (return len)
+                         (signal-elisp-error 'wrong-type-argument 'listp sequence)))))
+    ((or (stringp sequence) (vectorp sequence))
+     (cl:length sequence))
+    (t
+     (signal-elisp-error 'wrong-type-argument 'sequencep sequence))))
+
 (register-primitive 'length #'length)
 (register-primitive 'nth (lambda (n list) (nth n list)))
 (register-primitive 'nthcdr (lambda (n list) (nthcdr n list)))
-(register-primitive 'member (lambda (elt list) (member elt list :test #'elisp-equal)))
-(register-primitive 'memq (lambda (elt list) (member elt list :test #'eq)))
-(register-primitive 'assoc (lambda (key alist) (assoc key alist :test #'elisp-equal)))
-(register-primitive 'assq (lambda (key alist) (assoc key alist :test #'eq)))
-(register-primitive 'nconc (lambda (&rest lists) (apply #'nconc lists)))
-(register-primitive 'append (lambda (&rest lists) (apply #'append lists)))
+
+(defun member (elt list)
+  (cl:member elt list :test #'elisp-equal))
+
+(register-primitive 'member #'member)
+(register-primitive 'memq (lambda (elt list) (cl:member elt list :test #'eq)))
+
+(defun assoc (key alist)
+  (cl:assoc key alist :test #'elisp-equal))
+
+(register-primitive 'assoc #'assoc)
+(register-primitive 'assq (lambda (key alist) (cl:assoc key alist :test #'eq)))
+(register-primitive 'nconc (lambda (&rest lists) (apply #'cl:nconc lists)))
+
+(defun append (&rest lists)
+  (apply #'cl:append lists))
+
+(register-primitive 'append #'append)
 
 ;; Type Predicates
 (register-primitive 'symbolp (lambda (x) (if (symbolp x) 't nil)))
@@ -298,11 +331,40 @@
 (register-primitive 'listp (lambda (x) (if (listp x) 't nil)))
 (register-primitive 'arrayp (lambda (x) (if (or (stringp x) (vectorp x)) 't nil)))
 
-;; Symbols
-(register-primitive 'symbol-value #'elisp-symbol-value)
-(register-primitive 'symbol-function (lambda (sym) (or (gethash sym *primitives*) (signal-elisp-error 'void-function sym))))
-(register-primitive 'intern (lambda (str) (intern (string-upcase str) '#:holomacs)))
-(register-primitive 'make-symbol (lambda (str) (make-symbol str)))
+(defun symbol-value (symbol)
+  (elisp-symbol-value symbol))
+
+(register-primitive 'symbol-value #'symbol-value)
+
+(defun symbol-function (symbol)
+  (cond
+    ((gethash symbol *primitives*)
+     (gethash symbol *primitives*))
+    ((cl:fboundp symbol)
+     (fdefinition symbol))
+    (t
+     (signal-elisp-error 'void-function symbol))))
+
+(register-primitive 'symbol-function #'symbol-function)
+
+(defun fboundp (symbol)
+  (if (or (gethash symbol *primitives*)
+          (cl:fboundp symbol))
+      't
+      nil))
+
+(register-primitive 'fboundp #'fboundp)
+
+(defun intern (string &optional obarray)
+  (declare (ignore obarray))
+  (cl:intern (string-upcase string) '#:holomacs))
+
+(register-primitive 'intern #'intern)
+
+(defun make-symbol (string)
+  (cl:make-symbol string))
+
+(register-primitive 'make-symbol #'make-symbol)
 
 ;; Control Flow (Throw)
 (register-primitive 'throw (lambda (tag value) (throw tag value)))
@@ -365,7 +427,7 @@
 (register-primitive 'define-key
                     (lambda (keymap key definition)
                       (if (and (consp keymap) (eq (car keymap) 'keymap))
-                          (let ((existing (assoc key (cdr keymap) :test #'equal)))
+                          (let ((existing (cl:assoc key (cdr keymap) :test #'equal)))
                             (if existing
                                 (setf (cdr existing) definition)
                                 (setf (cdr keymap) (cons (cons key definition) (cdr keymap)))))
@@ -376,7 +438,7 @@
                     (lambda (keymap key &optional accept-default)
                       (declare (ignore accept-default))
                       (if (and (consp keymap) (eq (car keymap) 'keymap))
-                          (let ((binding (assoc key (cdr keymap) :test #'equal)))
+                          (let ((binding (cl:assoc key (cdr keymap) :test #'equal)))
                             (if binding
                                 (cdr binding)
                                 nil))
@@ -603,3 +665,8 @@
                            (elisp-goto-char (nth target-idx starts)))))
                       nil))
 
+;; Bind all registered primitive symbols to their function cells
+(maphash (lambda (sym fn)
+           (unless (cl:fboundp sym)
+             (setf (fdefinition sym) fn)))
+         *primitives*)

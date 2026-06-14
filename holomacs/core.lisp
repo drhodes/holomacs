@@ -76,29 +76,34 @@
 ;;;; =========================================================================
 
 (defun elisp-variable-boundp (var)
-  (or (assoc var *dynamic-env* :test #'eq)
+  (or (cl:assoc var *dynamic-env* :test #'eq)
       (and *current-buffer* (nth-value 1 (gethash var (buffer-local-vars *current-buffer*))))
+      (cl:boundp var)
       (nth-value 1 (gethash var *global-env*))))
 
 (defun elisp-symbol-value (var)
-  (let ((dyn-binding (assoc var *dynamic-env* :test #'eq)))
+  (let ((dyn-binding (cl:assoc var *dynamic-env* :test #'eq)))
     (if dyn-binding
         (cdr dyn-binding)
         (if *current-buffer*
             (multiple-value-bind (val found) (gethash var (buffer-local-vars *current-buffer*))
               (if found
                   val
-                  (multiple-value-bind (gval gfound) (gethash var *global-env*)
-                    (if gfound
-                        gval
-                        (signal-elisp-error 'void-variable var)))))
-            (multiple-value-bind (gval gfound) (gethash var *global-env*)
-              (if gfound
-                  gval
-                  (signal-elisp-error 'void-variable var)))))))
+                  (if (cl:boundp var)
+                      (cl:symbol-value var)
+                      (multiple-value-bind (gval gfound) (gethash var *global-env*)
+                        (if gfound
+                            gval
+                            (signal-elisp-error 'void-variable var))))))
+            (if (cl:boundp var)
+                (cl:symbol-value var)
+                (multiple-value-bind (gval gfound) (gethash var *global-env*)
+                  (if gfound
+                      gval
+                      (signal-elisp-error 'void-variable var))))))))
 
 (defun elisp-set-variable (var val)
-  (let ((dyn-binding (assoc var *dynamic-env* :test #'eq)))
+  (let ((dyn-binding (cl:assoc var *dynamic-env* :test #'eq)))
     (if dyn-binding
         (setf (cdr dyn-binding) val)
         (if *current-buffer*
@@ -106,8 +111,8 @@
               (declare (ignore lval))
               (if lfound
                   (setf (gethash var (buffer-local-vars *current-buffer*)) val)
-                  (setf (gethash var *global-env*) val)))
-            (setf (gethash var *global-env*) val))))
+                  (setf (cl:symbol-value var) val)))
+            (setf (cl:symbol-value var) val))))
   val)
 
 ;;;; =========================================================================
@@ -119,7 +124,7 @@
     (if existing
         existing
         (let ((new-buf (make-elisp-buffer :name name)))
-          (setf *buffers* (append *buffers* (list new-buf)))
+          (setf *buffers* (cl:append *buffers* (list new-buf)))
           new-buf))))
 
 (defun set-buffer (buf-or-name)
@@ -175,7 +180,7 @@
                                 collect (let ((var (if (listp b) (first b) b))
                                               (val-expr (if (listp b) (second b) nil)))
                                           (cons var (eval-elisp val-expr))))))
-            (let ((*dynamic-env* (append new-env *dynamic-env*)))
+            (let ((*dynamic-env* (cl:append new-env *dynamic-env*)))
               (eval-elisp (cons 'progn body)))))
          (let*
           (let* ((bindings (first args))
