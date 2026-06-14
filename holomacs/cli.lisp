@@ -1,8 +1,25 @@
 (in-package #:holomacs)
 
+(defun elisp-string-reader (stream char)
+  (declare (ignore char))
+  (let ((out (make-string-output-stream)))
+    (loop for c = (read-char stream t nil t)
+          until (char= c #\")
+          do (if (char= c #\\)
+                 (let ((next (read-char stream t nil t)))
+                   (case next
+                     (#\n (write-char #\Newline out))
+                     (#\t (write-char #\Tab out))
+                     (#\r (write-char #\Return out))
+                     (t (write-char next out))))
+                 (write-char c out)))
+    (get-output-stream-string out)))
+
 (defun run-file (filename)
   (init-elisp-state)
-  (let ((*package* (find-package '#:holomacs)))
+  (let ((*package* (find-package '#:holomacs))
+        (*readtable* (copy-readtable nil)))
+    (set-macro-character #\" #'elisp-string-reader)
     (with-open-file (stream filename :direction :input)
       (handler-case
           (loop

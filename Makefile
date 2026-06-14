@@ -5,8 +5,9 @@ build-oracle:
 
 run-demos:
 	chmod +x test_harness.py
-	python3 test_harness.py demos/demo_math.el demos/demo_buffer.el demos/demo_variables.el
+	python3 test_harness.py demos/demo_math.el demos/demo_buffer.el demos/demo_variables.el demos/demo_engine.el
 
 clean:
 	cd emacs-archaeology/src && rm -f *.o emacs_oracle
 	rm -rf debug_logs
+	rm -f temp_test_file.txt

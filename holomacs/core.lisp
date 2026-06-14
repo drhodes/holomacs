@@ -1,5 +1,16 @@
 (in-package #:holomacs)
 
+(define-condition elisp-error (error)
+  ((symbol :initarg :symbol :reader elisp-error-symbol)
+   (data :initarg :data :reader elisp-error-data))
+  (:report (lambda (condition stream)
+             (format stream "~A: ~A"
+                     (elisp-error-symbol condition)
+                     (elisp-error-data condition)))))
+
+(defun signal-elisp-error (symbol &rest data)
+  (error 'elisp-error :symbol symbol :data data))
+
 ;;;; =========================================================================
 ;;;; Core Data Structures & Environment
 ;;;; =========================================================================
@@ -14,6 +25,7 @@
 (defvar *current-buffer* nil)
 (defvar *global-env* (make-hash-table :test 'eq))
 (defvar *dynamic-env* nil) ; Alist of (symbol . value)
+(defvar *noninteractive-need-newline* nil)
 
 ;; Standard output capture
 (defvar *elisp-output* (make-string-output-stream))
@@ -22,7 +34,8 @@
 (defun init-elisp-state ()
   (setf *buffers* nil
         *current-buffer* nil
-        *dynamic-env* nil)
+        *dynamic-env* nil
+        *noninteractive-need-newline* nil)
   (clrhash *global-env*)
   (setf *elisp-output* (make-string-output-stream))
   ;; Initialize nil and t in global env
@@ -52,11 +65,11 @@
                   (multiple-value-bind (gval gfound) (gethash var *global-env*)
                     (if gfound
                         gval
-                        (error "Symbol's value as variable is void: ~A" var)))))
+                        (signal-elisp-error 'void-variable var)))))
             (multiple-value-bind (gval gfound) (gethash var *global-env*)
               (if gfound
                   gval
-                  (error "Symbol's value as variable is void: ~A" var)))))))
+                  (signal-elisp-error 'void-variable var)))))))
 
 (defun elisp-set-variable (var val)
   (let ((dyn-binding (assoc var *dynamic-env* :test #'eq)))
@@ -154,10 +167,40 @@
             (loop while (eval-elisp cond-expr) do
                   (setf last-val (eval-elisp (cons 'progn body))))
             last-val))
+         (catch
+          (let ((tag (eval-elisp (first args)))
+                (body (rest args)))
+            (catch tag
+              (eval-elisp (cons 'progn body)))))
+         (condition-case
+          (let ((var (first args))
+                (bodyform (second args))
+                (handlers (cddr args)))
+            (handler-case
+                (eval-elisp bodyform)
+              (error (c)
+                (let ((matching-handler (find 'error handlers :key #'first)))
+                  (if matching-handler
+                      (let ((handler-body (rest matching-handler)))
+                        (let* ((err-val (if (typep c 'elisp-error)
+                                            (cons (elisp-error-symbol c) (elisp-error-data c))
+                                            (list 'error (format nil "~A" c)))))
+                          (if var
+                              (let ((*dynamic-env* (cons (cons var err-val) *dynamic-env*)))
+                                (eval-elisp (cons 'progn handler-body)))
+                              (eval-elisp (cons 'progn handler-body)))))
+                      (error c)))))))
+         (unwind-protect
+          (let ((bodyform (first args))
+                (unwind-forms (rest args)))
+            (unwind-protect
+                (eval-elisp bodyform)
+              (dolist (form unwind-forms)
+                (eval-elisp form)))))
          (t
           ;; Normal function call
           (let ((prim (gethash head *primitives*)))
             (if prim
                 (apply prim (mapcar #'eval-elisp args))
-                (error "Unknown function: ~A" head)))))))
+                (signal-elisp-error 'void-function head)))))))
     (t (error "Cannot evaluate: ~A" expr))))
