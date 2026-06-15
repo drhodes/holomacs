@@ -11,20 +11,20 @@
          (len (cl:length contents))
          (out (make-string-output-stream)))
     ;; Print header / top border
-    (format out "=== BUFFER: ~A ===~%" (buffer-name buf))
+    (cl:format out "=== BUFFER: ~A ===~%" (buffer-name buf))
     ;; Print contents character by character, highlighting the cursor point
     (loop for i from 0 to len do
           (cond
             ((= i (1- pt))
              ;; Point location
              (if (< i len)
-                 (format out "~C[7m~C~C[0m" #\Esc (aref contents i) #\Esc)
-                 (format out "~C[7m ~C[0m" #\Esc #\Esc)))
+                 (cl:format out "~C[7m~C~C[0m" #\Esc (aref contents i) #\Esc)
+                 (cl:format out "~C[7m ~C[0m" #\Esc #\Esc)))
             ((< i len)
              (write-char (aref contents i) out))))
     (terpri out)
     ;; Print modeline / status bar at the bottom
-    (format out "--- ~A (Fundamental) --- Point: ~A ---~%" (buffer-name buf) pt)
+    (cl:format out "--- ~A (Fundamental) --- Point: ~A ---~%" (buffer-name buf) pt)
     (get-output-stream-string out)))
 
 (defun redisplay ()
@@ -33,7 +33,7 @@
                (elisp-symbol-value 'noninteractive))
     (let ((screen (render-buffer-screen *current-buffer*)))
       ;; Clear terminal and print screen
-      (format *standard-output* "~C[H~C[2J" #\Esc #\Esc)
+      (cl:format *standard-output* "~C[H~C[2J" #\Esc #\Esc)
       (write-string screen *standard-output*)
       (force-output *standard-output*)))
   nil)

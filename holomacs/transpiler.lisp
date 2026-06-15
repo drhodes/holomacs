@@ -1,5 +1,19 @@
 (in-package #:holomacs)
 
+(defun extract-lambda-list-symbols (lambda-list)
+  (let (symbols)
+    (labels ((recur (x)
+               (cond
+                 ((null x) nil)
+                 ((symbolp x)
+                  (unless (member x '(&optional &rest &key &aux))
+                    (push x symbols)))
+                 ((consp x)
+                  (recur (car x))
+                  (recur (cdr x))))))
+      (recur lambda-list))
+    (nreverse symbols)))
+
 (defun transpile-elisp (expr)
   "Recursively transpile an Elisp expression into a Common Lisp expression."
   (cond
@@ -11,7 +25,7 @@
         expr)
        (t
         `(elisp-symbol-value ',expr))))
-    ((or (numberp expr) (stringp expr) (characterp expr))
+    ((or (cl:numberp expr) (stringp expr) (characterp expr))
      expr)
     ((consp expr)
      (let ((head (car expr))
@@ -48,9 +62,10 @@
                                             (list (first b) (transpile-elisp (second b)))
                                             b))
                                       bindings))
-                 (vars (mapcar (lambda (b) (if (listp b) (first b) b)) bindings)))
+                 (vars (mapcar (lambda (b) (if (listp b) (first b) b)) bindings))
+                 (special-vars (remove-if (lambda (x) (and (symbolp x) (eq (symbol-package x) (find-package '#:common-lisp)))) vars)))
             `(let ,cl-bindings
-               (declare (special ,@vars))
+               (declare (special ,@special-vars))
                ,@(mapcar #'transpile-elisp body))))
          (let*
           (let* ((bindings (first args))
@@ -60,9 +75,10 @@
                                             (list (first b) (transpile-elisp (second b)))
                                             b))
                                       bindings))
-                 (vars (mapcar (lambda (b) (if (listp b) (first b) b)) bindings)))
+                 (vars (mapcar (lambda (b) (if (listp b) (first b) b)) bindings))
+                 (special-vars (remove-if (lambda (x) (and (symbolp x) (eq (symbol-package x) (find-package '#:common-lisp)))) vars)))
             `(let* ,cl-bindings
-               (declare (special ,@vars))
+               (declare (special ,@special-vars))
                ,@(mapcar #'transpile-elisp body))))
          (defun
           (let* ((name (first args))
@@ -70,13 +86,13 @@
                  (body (cddr args))
                  (first-form (first body))
                  (is-interactive (and (consp first-form)
-                                      (string= (string-upcase (symbol-name (car first-form))) "INTERACTIVE")))
+                                      (cl:string= (string-upcase (symbol-name (car first-form))) "INTERACTIVE")))
                  (interactive-spec (when is-interactive (cdr first-form)))
                  (real-body (if is-interactive (rest body) body))
                  (name-str (symbol-name name))
                  (defun-form `(setf (cl:symbol-function (intern ,name-str (find-package '#:holomacs)))
                                     (lambda ,params
-                                      (declare (special ,@params))
+                                      (declare (special ,@(remove-if (lambda (x) (and (symbolp x) (or (member x '(&optional &rest &key &aux)) (eq (symbol-package x) (find-package '#:common-lisp))))) params)))
                                       ,@(mapcar #'transpile-elisp real-body)))))
             (if is-interactive
                 `(progn
@@ -90,6 +106,33 @@
                 `(progn
                   ,defun-form
                   (intern ,name-str (find-package '#:holomacs))))))
+         (defvar
+          (let ((var (first args))
+                (val-expr (second args)))
+            `(unless (elisp-variable-boundp ',var)
+               (elisp-set-variable ',var ,(if val-expr (transpile-elisp val-expr) nil)))))
+         (defconst
+          (let ((var (first args))
+                (val-expr (second args)))
+            `(elisp-set-variable ',var ,(transpile-elisp val-expr))))
+         (defcustom
+          (let ((var (first args))
+                (val-expr (second args)))
+            `(unless (elisp-variable-boundp ',var)
+               (elisp-set-variable ',var ,(if val-expr (transpile-elisp val-expr) nil)))))
+         (defmacro
+          (let* ((name (first args))
+                 (params (second args))
+                 (body (cddr args))
+                 (name-str (symbol-name name))
+                 (special-vars (remove-if (lambda (x)
+                                            (or (null x)
+                                                (eq x 't)
+                                                (eq (symbol-package x) (find-package '#:common-lisp))))
+                                          (extract-lambda-list-symbols params))))
+            `(cl:defmacro ,(intern name-str (find-package '#:holomacs)) ,params
+               (declare (special ,@special-vars))
+               ,@(mapcar #'transpile-elisp body))))
          (while
           `(loop while ,(transpile-elisp (first args))
                  do (progn ,@(mapcar #'transpile-elisp (rest args)))))
@@ -111,13 +154,13 @@
                    ,@(let ((matching-handler (find 'error handlers :key #'first)))
                        (if matching-handler
                            (mapcar #'transpile-elisp (rest matching-handler))
-                           (list `(error c)))))))))
+                           (list `(cl:error c)))))))))
          (unwind-protect
           `(unwind-protect ,(transpile-elisp (first args))
              ,@(mapcar #'transpile-elisp (rest args))))
          (t
           `(,head ,@(mapcar #'transpile-elisp args))))))
-    (t (error "Cannot transpile: ~A" expr))))
+    (t (cl:error "Cannot transpile: ~A" expr))))
 
 (defun compile-elisp-form (expr)
   "Transpile and evaluate/compile a single Elisp form."

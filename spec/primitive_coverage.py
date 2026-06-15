@@ -78,8 +78,53 @@ class HashTablePrimitivesReq(Req):
     '''
 
 
+class SymbolPlistsReq(Req):
+    r'''The engine must implement symbol property list primitives.
+    - `get` returns the property value of a symbol for a given indicator.
+    - `put` sets the property value of a symbol for a given indicator.
+    '''
+
+
+class FsetReq(Req):
+    r'''The engine must implement `fset` primitive.
+    - It sets a symbol's function cell definition.
+    '''
+
+
+class SafeListAccessReq(Req):
+    r'''The engine must implement `car-safe` and `cdr-safe` primitives.
+    - `car-safe` returns the CAR if argument is a cons cell, nil otherwise.
+    - `cdr-safe` returns the CDR if argument is a cons cell, nil otherwise.
+    '''
+
+
+class SetcdrReq(Req):
+    r'''The engine must implement `setcdr` primitive.
+    - It mutates the CDR of a cons cell.
+    '''
+
+
+class AsetReq(Req):
+    r'''The engine must implement `aset` primitive.
+    - It modifies the element of a vector or string at a given index.
+    '''
+
+
+class WindowStubReq(Req):
+    r'''The engine must implement basic window query stubs.
+    - `selected-window` returns a default window object.
+    - `next-window` returns a default window object.
+    '''
+
+
+class DingReq(Req):
+    r'''The engine must implement `ding` primitive.
+    - It rings the bell / acts as a no-op.
+    '''
+
+
 class PrimitiveCoverageUnitTestReq(Req):
-    r'''The unit tests must verify `bolp`, `bobp`, `eolp`, `eobp`, `char-after`, `buffer-size`, `buffer-string`, `string-match`, `match-beginning`, `match-end`, `replace-match`, `search-forward`, `search-backward`, `skip-chars-forward`, `skip-chars-backward`, case conversion, `looking-at`, and hash tables.
+    r'''The unit tests must verify `bolp`, `bobp`, `eolp`, `eobp`, `char-after`, `buffer-size`, `buffer-string`, `string-match`, `match-beginning`, `match-end`, `replace-match`, `search-forward`, `search-backward`, `skip-chars-forward`, `skip-chars-backward`, case conversion, `looking-at`, hash tables, symbol properties (get/put), fset, safe list accessors, setcdr, aset, window stubs, and ding.
     '''
 
 

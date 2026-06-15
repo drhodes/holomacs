@@ -20,7 +20,7 @@
           for key = (first plist)
           for val = (second plist)
           do (if (and (symbolp key)
-                      (string= (string-upcase (symbol-name key)) "INTERACTIVE"))
+                      (cl:string= (string-upcase (symbol-name key)) "INTERACTIVE"))
                  (progn (setf found-key key
                               found-val val)
                         (return))
@@ -45,7 +45,7 @@
         val)
       (let ((char (cl:read-char *standard-input* nil :eof)))
         (if (eq char :eof)
-            (error "End of input stream in read-char")
+            (cl:error "End of input stream in read-char")
             (char-code char)))))
 
 (register-primitive 'read-char #'read-char)
@@ -62,12 +62,12 @@
 (register-primitive 'self-insert-command #'self-insert-command)
 
 (defun call-interactively (cmd &optional recordkeys keys)
-  (declare (ignore recordkeys keys))
+  (declare (cl:ignore recordkeys keys))
   (let* ((func (if (symbolp cmd) (symbol-function cmd) cmd))
          (interactive-prop (and (symbolp cmd) (nth-value 1 (get-interactive-prop cmd)))))
     (cond
       ((null interactive-prop)
-       (error "Wrong type argument: commandp ~A" cmd))
+       (cl:error "Wrong type argument: commandp ~A" cmd))
       ((or (eq interactive-prop t) (eq interactive-prop :user-interactive))
        ;; No arguments
        (funcall func))
@@ -98,7 +98,7 @@
                     ;; Read string or prompt from stdin
                     (unless (and (elisp-variable-boundp 'noninteractive)
                                  (elisp-symbol-value 'noninteractive))
-                      (format *error-output* "~A" prompt)
+                      (cl:format *error-output* "~A" prompt)
                       (force-output *error-output*))
                     (let ((val (cl:read-line *standard-input* nil nil)))
                       ;; strip trailing return if any (windows line endings)
@@ -106,15 +106,15 @@
                         (setf val (subseq val 0 (1- (cl:length val)))))
                       (push (or val "") args)))
                    (t
-                    (error "Unsupported interactive code ~S" code)))))
+                    (cl:error "Unsupported interactive code ~S" code)))))
          (apply func (nreverse args))))
       (t
-       (error "Invalid interactive property ~S" interactive-prop)))))
+       (cl:error "Invalid interactive property ~S" interactive-prop)))))
 
 (register-primitive 'call-interactively #'call-interactively)
 
 (defun command-execute (cmd &optional record)
-  (declare (ignore record))
+  (declare (cl:ignore record))
   (let ((prev this-command))
     (setq this-command cmd)
     (if (commandp cmd)
@@ -151,10 +151,10 @@
           (setq *this-command-keys* key-seq)
           (if cmd
               (command-execute cmd)
-              (error "Unbound key: ~A" key-seq))))
-    (error (err)
-      (unless (search "End of input stream" (format nil "~A" err))
-        (error err)))))
+              (cl:error "Unbound key: ~A" key-seq))))
+    (cl:error (err)
+      (unless (search "End of input stream" (cl:format nil "~A" err))
+        (cl:error err)))))
 
 (register-primitive 'command-loop #'command-loop)
 

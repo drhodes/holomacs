@@ -1,15 +1,15 @@
 (in-package #:holomacs)
 
-(define-condition elisp-error (error)
+(define-condition elisp-error (cl:error)
   ((symbol :initarg :symbol :reader elisp-error-symbol)
    (data :initarg :data :reader elisp-error-data))
   (:report (lambda (condition stream)
-             (format stream "~A: ~A"
+             (cl:format stream "~A: ~A"
                      (elisp-error-symbol condition)
                      (elisp-error-data condition)))))
 
 (defun signal-elisp-error (symbol &rest data)
-  (error 'elisp-error :symbol symbol :data data))
+  (cl:error 'elisp-error :symbol symbol :data data))
 
 ;;;; =========================================================================
 ;;;; Core Data Structures & Environment
@@ -30,12 +30,12 @@
   (insertion-type nil))
 
 (defun print-elisp-marker (marker stream depth)
-  (declare (ignore depth))
+  (declare (cl:ignore depth))
   (if (marker-buffer marker)
-      (format stream "#<marker at ~A in ~A>"
+      (cl:format stream "#<marker at ~A in ~A>"
               (marker-position marker)
               (buffer-name (marker-buffer marker)))
-      (format stream "#<marker in no buffer>")))
+      (cl:format stream "#<marker in no buffer>")))
 
 (defun resolve-position (pos)
   (cond
@@ -112,7 +112,7 @@
         (setf (cdr dyn-binding) val)
         (if *current-buffer*
             (multiple-value-bind (lval lfound) (cl:gethash var (buffer-local-vars *current-buffer*))
-              (declare (ignore lval))
+              (declare (cl:ignore lval))
               (if lfound
                   (setf (cl:gethash var (buffer-local-vars *current-buffer*)) val)
                   (setf (cl:symbol-value var) val)))
@@ -124,7 +124,7 @@
 ;;;; =========================================================================
 
 (defun get-buffer-create (name)
-  (let ((existing (find name *buffers* :key #'buffer-name :test #'string=)))
+  (let ((existing (find name *buffers* :key #'buffer-name :test #'cl:string=)))
     (if existing
         existing
         (let ((new-buf (make-elisp-buffer :name name)))
@@ -153,7 +153,7 @@
     ((eq expr 't) 't)
     ((symbolp expr)
      (elisp-symbol-value expr))
-    ((or (numberp expr) (stringp expr) (characterp expr))
+    ((or (cl:numberp expr) (stringp expr) (characterp expr))
      expr)
     ((consp expr)
      (let ((head (car expr))
@@ -213,18 +213,17 @@
                 (handlers (cddr args)))
             (handler-case
                 (eval-elisp bodyform)
-              (error (c)
+              (cl:error (c)
                 (let ((matching-handler (find 'error handlers :key #'first)))
                   (if matching-handler
-                      (let ((handler-body (rest matching-handler)))
-                        (let* ((err-val (if (typep c 'elisp-error)
-                                            (cons (elisp-error-symbol c) (elisp-error-data c))
-                                            (list 'error (format nil "~A" c)))))
-                          (if var
-                              (let ((*dynamic-env* (cons (cons var err-val) *dynamic-env*)))
-                                (eval-elisp (cons 'progn handler-body)))
-                              (eval-elisp (cons 'progn handler-body)))))
-                      (error c)))))))
+                      (let* ((err-val (if (typep c 'elisp-error)
+                                          (cons (elisp-error-symbol c) (elisp-error-data c))
+                                          (list 'error (cl:format nil "~A" c)))))
+                        (if var
+                            (let ((*dynamic-env* (cons (cons var err-val) *dynamic-env*)))
+                              (eval-elisp (cons 'progn (rest matching-handler))))
+                            (eval-elisp (cons 'progn (rest matching-handler)))))
+                      (cl:error c)))))))
          (unwind-protect
           (let ((bodyform (first args))
                 (unwind-forms (rest args)))
@@ -238,4 +237,4 @@
             (if prim
                 (apply prim (mapcar #'eval-elisp args))
                 (signal-elisp-error 'void-function head)))))))
-    (t (error "Cannot evaluate: ~A" expr))))
+    (t (cl:error "Cannot evaluate: ~A" expr))))

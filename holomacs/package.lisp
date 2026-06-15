@@ -2,7 +2,9 @@
   (:use #:cl)
   (:shadow #:equal #:length #:member #:assoc #:append #:print
            #:symbol-value #:symbol-function #:boundp #:fboundp #:intern #:make-symbol
-           #:read-char #:make-hash-table #:gethash #:remhash)
+           #:read-char #:make-hash-table #:gethash #:remhash #:error #:format #:get
+           #:ignore
+           #:string= #:string-equal #:string< #:string-lessp #:eql #:not #:numberp #:rplaca #:rplacd)
   (:export ;; Public API
            #:run-file
            #:run-string
@@ -68,5 +70,20 @@
            #:make-hash-table
            #:gethash
            #:puthash
-           #:remhash))
+           #:remhash
+           ;; properties
+           #:get
+           #:put
+           ;; fset
+           #:fset
+           ;; safe lists and mutation
+           #:car-safe
+           #:cdr-safe
+           #:setcdr
+           ;; aset
+           #:aset
+           ;; windows and bells
+           #:selected-window
+           #:next-window
+           #:ding))
 

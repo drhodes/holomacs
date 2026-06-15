@@ -21,12 +21,12 @@
            (write-char #\" out)
            (get-output-stream-string out))
          obj))
-    ((integerp obj) (format nil "~D" obj))
-    ((numberp obj) (format nil "~A" obj))
-    ((characterp obj) (if readable (format nil "?~C" obj) (string obj)))
-    ((elisp-buffer-p obj) (format nil "#<buffer ~A>" (buffer-name obj)))
+    ((integerp obj) (cl:format nil "~D" obj))
+    ((cl:numberp obj) (cl:format nil "~A" obj))
+    ((characterp obj) (if readable (cl:format nil "?~C" obj) (string obj)))
+    ((elisp-buffer-p obj) (cl:format nil "#<buffer ~A>" (buffer-name obj)))
     ((vectorp obj)
-     (format nil "[~{~A~^ ~}]" (map 'list (lambda (x) (elisp-print-object x t)) obj)))
+     (cl:format nil "[~{~A~^ ~}]" (map 'list (lambda (x) (elisp-print-object x t)) obj)))
     ((consp obj)
      (let ((result (make-string-output-stream)))
        (write-char #\( result)
@@ -43,7 +43,7 @@
               (return)))))
        (write-char #\) result)
        (get-output-stream-string result)))
-    (t (format nil "~A" obj))))
+    (t (cl:format nil "~A" obj))))
 
 (defun elisp-to-string (obj)
   (elisp-print-object obj nil))
@@ -66,20 +66,31 @@
                         (#\% (write-char #\% out))
                         (#\s (if (< arg-idx (length args))
                                  (write-string (elisp-print-object (nth arg-idx args) nil) out)
-                                 (error "Not enough arguments for format string"))
+                                 (cl:error "Not enough arguments for format string"))
                              (incf arg-idx))
                         (#\S (if (< arg-idx (length args))
                                  (write-string (elisp-print-object (nth arg-idx args) t) out)
-                                 (error "Not enough arguments for format string"))
+                                 (cl:error "Not enough arguments for format string"))
                              (incf arg-idx))
                         (#\d (if (< arg-idx (length args))
-                                 (write-string (format nil "~D" (nth arg-idx args)) out)
-                                 (error "Not enough arguments for format string"))
+                                 (write-string (cl:format nil "~D" (nth arg-idx args)) out)
+                                 (cl:error "Not enough arguments for format string"))
                              (incf arg-idx))
                         (t (write-char #\% out) (write-char next out))))
                     (progn (write-char #\% out) (incf i)))
                 (progn (write-char c out) (incf i)))))
     (get-output-stream-string out)))
+
+(defun format (format-str &rest args)
+  (apply #'format-elisp format-str args))
+
+(register-primitive 'format #'format)
+
+(defun error (format-str &rest args)
+  (let ((msg (apply #'format-elisp format-str args)))
+    (signal-elisp-error 'error msg)))
+
+(register-primitive 'error #'error)
 
 (defun adjust-markers-on-insert (buf pos len)
   (dolist (m (buffer-markers buf))
@@ -145,7 +156,7 @@
                     (lambda (buf)
                       (if (elisp-buffer-p buf)
                           (buffer-name buf)
-                          (error "Wrong type argument: bufferp"))))
+                          (cl:error "Wrong type argument: bufferp"))))
 
 (register-primitive 'point
                     (lambda ()
@@ -202,20 +213,20 @@
                               (adjust-markers-on-insert buf pos len)))))))
 
 (defun print (obj &optional stream)
-  (declare (ignore stream))
-  (format *elisp-output* "~%~A~%" (elisp-to-string-readable obj))
+  (declare (cl:ignore stream))
+  (cl:format *elisp-output* "~%~A~%" (elisp-to-string-readable obj))
   (setf *noninteractive-need-newline* t)
   obj)
-
+ 
 (register-primitive 'print #'print)
-
+ 
 (register-primitive 'message
                     (lambda (format-str &rest args)
                       (let ((msg (apply #'format-elisp format-str args)))
                         (when *noninteractive-need-newline*
                           (write-char #\Newline *elisp-output*)
                           (setf *noninteractive-need-newline* nil))
-                        (format *elisp-output* "~A~%" msg)
+                        (cl:format *elisp-output* "~A~%" msg)
                         msg)))
 
 (register-primitive 'concat
@@ -224,7 +235,7 @@
 
 (register-primitive 'int-to-string
                     (lambda (n)
-                      (format nil "~D" n)))
+                      (cl:format nil "~D" n)))
 
 (register-primitive 'char-to-string
                     (lambda (char-code)
@@ -238,7 +249,7 @@
 
 (register-primitive 'string-equal
                     (lambda (s1 s2)
-                      (if (string= (elisp-to-string s1) (elisp-to-string s2)) 't nil)))
+                      (if (cl:string= (elisp-to-string s1) (elisp-to-string s2)) 't nil)))
 
 (register-primitive 'substring
                     (lambda (str start &optional end)
@@ -275,7 +286,7 @@
 (defun elisp-equal (x y)
   (cond
     ((eq x y) t)
-    ((and (stringp x) (stringp y)) (string= x y))
+    ((and (stringp x) (stringp y)) (cl:string= x y))
     ((and (consp x) (consp y))
      (and (elisp-equal (car x) (car y))
           (elisp-equal (cdr x) (cdr y))))
@@ -337,9 +348,31 @@
 (register-primitive 'symbolp (lambda (x) (if (symbolp x) 't nil)))
 (register-primitive 'stringp (lambda (x) (if (stringp x) 't nil)))
 (register-primitive 'integerp (lambda (x) (if (integerp x) 't nil)))
-(register-primitive 'numberp (lambda (x) (if (numberp x) 't nil)))
+(register-primitive 'numberp (lambda (x) (if (cl:numberp x) 't nil)))
 (register-primitive 'listp (lambda (x) (if (listp x) 't nil)))
 (register-primitive 'arrayp (lambda (x) (if (or (stringp x) (vectorp x)) 't nil)))
+
+(defun not (x)
+  (cl:not x))
+
+(register-primitive 'not #'not)
+
+(defun eql (x y)
+  (if (cl:eql x y) 't nil))
+
+(register-primitive 'eql #'eql)
+
+(defun rplaca (x y)
+  (cl:rplaca x y)
+  x)
+
+(register-primitive 'rplaca #'rplaca)
+
+(defun rplacd (x y)
+  (cl:rplacd x y)
+  x)
+
+(register-primitive 'rplacd #'rplacd)
 
 (defun symbol-value (symbol)
   (elisp-symbol-value symbol))
@@ -366,7 +399,7 @@
 (register-primitive 'fboundp #'fboundp)
 
 (defun intern (string &optional obarray)
-  (declare (ignore obarray))
+  (declare (cl:ignore obarray))
   (cl:intern (string-upcase string) '#:holomacs))
 
 (register-primitive 'intern #'intern)
@@ -382,7 +415,7 @@
 ;; File I/O
 (register-primitive 'find-file-noselect
                     (lambda (filename &optional nowarn rawfile wildcards)
-                      (declare (ignore nowarn rawfile wildcards))
+                      (declare (cl:ignore nowarn rawfile wildcards))
                       (let* ((name (file-namestring filename))
                              (buf (get-buffer-create name)))
                         (with-open-file (stream filename :direction :input :if-does-not-exist nil)
@@ -399,7 +432,7 @@
 
 (register-primitive 'write-region
                     (lambda (start end filename &optional append visit lockname mustbenew)
-                      (declare (ignore visit lockname mustbenew))
+                      (declare (cl:ignore visit lockname mustbenew))
                       (let ((str (if (stringp start)
                                      start
                                      (let ((contents (buffer-contents *current-buffer*))
@@ -413,12 +446,12 @@
                           (write-string str stream))
                         ;; Print the message like Emacs does: "Wrote <abspath>"
                         (let ((abspath (namestring (truename filename))))
-                          (format *elisp-output* "Wrote ~A~%" abspath)))
+                          (cl:format *elisp-output* "Wrote ~A~%" abspath)))
                       nil))
 
 (register-primitive 'insert-file-contents
                     (lambda (filename &optional visit beg end replace)
-                      (declare (ignore visit beg end replace))
+                      (declare (cl:ignore visit beg end replace))
                       (let ((old-point (buffer-point *current-buffer*)))
                         (with-open-file (stream filename :direction :input :if-does-not-exist nil)
                           (when stream
@@ -431,7 +464,7 @@
 ;; Keymaps
 (register-primitive 'make-sparse-keymap
                     (lambda (&optional prompt)
-                      (declare (ignore prompt))
+                      (declare (cl:ignore prompt))
                       (list 'keymap)))
 
 (register-primitive 'define-key
@@ -441,18 +474,18 @@
                             (if existing
                                 (setf (cdr existing) definition)
                                 (setf (cdr keymap) (cons (cons key definition) (cdr keymap)))))
-                          (error "Wrong type argument: keymapp"))
+                          (cl:error "Wrong type argument: keymapp"))
                       definition))
 
 (register-primitive 'lookup-key
                     (lambda (keymap key &optional accept-default)
-                      (declare (ignore accept-default))
+                      (declare (cl:ignore accept-default))
                       (if (and (consp keymap) (eq (car keymap) 'keymap))
                           (let ((binding (cl:assoc key (cdr keymap) :test #'equal)))
                             (if binding
                                 (cdr binding)
                                 nil))
-                          (error "Wrong type argument: keymapp"))))
+                          (cl:error "Wrong type argument: keymapp"))))
 
 (defvar global-map nil)
 (declaim (special global-map))
@@ -480,7 +513,7 @@
 
 (register-primitive 'number-or-marker-p
                     (lambda (x)
-                      (if (or (numberp x) (elisp-marker-p x)) 't nil)))
+                      (if (or (cl:numberp x) (elisp-marker-p x)) 't nil)))
 
 (register-primitive 'marker-position
                     (lambda (m)
@@ -586,7 +619,7 @@
 
 (register-primitive 'delete-char
                     (lambda (n &optional killflag)
-                      (declare (ignore killflag))
+                      (declare (cl:ignore killflag))
                       (let* ((pt (buffer-point *current-buffer*))
                              (max-pos (1+ (length (buffer-contents *current-buffer*)))))
                         (if (> n 0)
@@ -624,7 +657,7 @@
 
 (register-primitive 'beginning-of-line
                     (lambda (&optional n)
-                      (declare (ignore n))
+                      (declare (cl:ignore n))
                       (elisp-goto-char (line-beginning-position))
                       nil))
 
@@ -640,7 +673,7 @@
 
 (register-primitive 'end-of-line
                     (lambda (&optional n)
-                      (declare (ignore n))
+                      (declare (cl:ignore n))
                       (elisp-goto-char (line-end-position))
                       nil))
 
@@ -779,7 +812,7 @@
 
 (register-primitive 'replace-match
                     (lambda (newtext &optional fixedcase literal string subexp)
-                      (declare (ignore fixedcase literal subexp))
+                      (declare (cl:ignore fixedcase literal subexp))
                       ;; ReplaceMatchReq
                       (if string
                           (let* ((m-start (aref *last-match-start* 0))
@@ -796,7 +829,7 @@
 
 (register-primitive 'search-forward
                     (lambda (str &optional limit noerror repeat)
-                      (declare (ignore limit repeat))
+                      (declare (cl:ignore limit repeat))
                       ;; SimpleSearchReq
                       (let* ((buf *current-buffer*)
                              (contents (buffer-contents buf))
@@ -812,7 +845,7 @@
 
 (register-primitive 'search-backward
                     (lambda (str &optional limit noerror repeat)
-                      (declare (ignore limit repeat))
+                      (declare (cl:ignore limit repeat))
                       ;; SimpleSearchReq
                       (let* ((buf *current-buffer*)
                              (contents (buffer-contents buf))
@@ -828,7 +861,7 @@
 
 (register-primitive 'skip-chars-forward
                     (lambda (char-set &optional limit)
-                      (declare (ignore limit))
+                      (declare (cl:ignore limit))
                       ;; SkipCharsReq
                       (let* ((buf *current-buffer*)
                              (contents (buffer-contents buf))
@@ -846,7 +879,7 @@
 
 (register-primitive 'skip-chars-backward
                     (lambda (char-set &optional limit)
-                      (declare (ignore limit))
+                      (declare (cl:ignore limit))
                       ;; SkipCharsReq
                       (let* ((buf *current-buffer*)
                              (contents (buffer-contents buf))
@@ -961,7 +994,7 @@
 
 (register-primitive 'make-hash-table
                     (lambda (&rest args)
-                      (declare (ignore args))
+                      (declare (cl:ignore args))
                       ;; HashTablePrimitivesReq
                       (cl:make-hash-table :test 'cl:equal)))
 
@@ -981,6 +1014,66 @@
                       ;; HashTablePrimitivesReq
                       (cl:remhash key table)
                       nil))
+(defun get (symbol indicator &optional default)
+  (cl:get symbol indicator default))
+
+(defun (setf get) (value symbol indicator &optional default)
+  (declare (cl:ignore default))
+  (setf (cl:get symbol indicator) value))
+
+(register-primitive 'get #'get)
+ 
+(register-primitive 'put
+                    (lambda (symbol indicator value)
+                      (setf (cl:get symbol indicator) value)))
+
+(register-primitive 'car-safe
+                    (lambda (x)
+                      (if (consp x) (car x) nil)))
+
+(register-primitive 'cdr-safe
+                    (lambda (x)
+                      (if (consp x) (cdr x) nil)))
+
+(register-primitive 'setcdr
+                    (lambda (cell newcdr)
+                      (setf (cdr cell) newcdr)
+                      newcdr))
+
+(register-primitive 'aset
+                    (lambda (array index newelt)
+                      (if (stringp array)
+                          (setf (char array index) (code-char newelt))
+                          (setf (aref array index) newelt))
+                      newelt))
+
+(register-primitive 'selected-window
+                    (lambda () 'selected-window))
+
+(register-primitive 'next-window
+                    (lambda (&rest args)
+                      (declare (cl:ignore args))
+                      'selected-window))
+
+(register-primitive 'ignore
+                    (lambda (&rest args)
+                      (declare (cl:ignore args))
+                      nil))
+
+(register-primitive 'ding
+                    (lambda () nil))
+
+(register-primitive 'fset
+                    (lambda (symbol function)
+                      (let ((fn-obj (cond
+                                      ((and (consp function) (eq (car function) 'lambda))
+                                       (coerce function 'function))
+                                      ((symbolp function)
+                                       (lambda (&rest args)
+                                         (apply (symbol-function function) args)))
+                                      (t function))))
+                        (setf (cl:symbol-function symbol) fn-obj)
+                        function)))
 
 
 ;; Bind all registered primitive symbols to their function cells

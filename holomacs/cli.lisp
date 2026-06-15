@@ -1,7 +1,7 @@
 (in-package #:holomacs)
 
 (defun elisp-string-reader (stream char)
-  (declare (ignore char))
+  (declare (cl:ignore char))
   (let ((out (make-string-output-stream)))
     (loop for c = (cl:read-char stream t nil t)
           until (char= c #\")
@@ -17,7 +17,7 @@
 
 (defun elisp-char-reader (stream char)
   "Reader macro for Elisp ?x character literals. Returns the integer char code."
-  (declare (ignore char))
+  (declare (cl:ignore char))
   (let ((next (cl:read-char stream t nil t)))
     (if (char= next #\\)
         ;; Escape sequence: ?\n ?\t ?\r ?\\ etc.
@@ -43,8 +43,8 @@
   (init-elisp-state)
   (handler-case
       (load-elisp-file filename)
-    (error (err)
-      (format *error-output* "Error during execution: ~A~%" err)
+    (cl:error (err)
+      (cl:format *error-output* "Error during execution: ~A~%" err)
       (uiop:quit 1)))
   ;; Print captured output to standard output
   (write-string (get-output-stream-string *elisp-output*)))
@@ -60,7 +60,7 @@
               (if (eq expr :eof)
                   (return)
                   (compile-elisp-form expr))))
-        (error (err)
-          (format *error-output* "Error during execution: ~A~%" err)
+        (cl:error (err)
+          (cl:format *error-output* "Error during execution: ~A~%" err)
           (uiop:quit 1)))))
   (write-string (get-output-stream-string *elisp-output*)))
