@@ -8,6 +8,7 @@
                (:file "transpiler")
                (:file "primitives")
                (:file "command_loop")
+               (:file "redisplay")
                (:file "cli")))
 
 (asdf:defsystem #:holomacs/tests
@@ -21,6 +22,8 @@
                (:file "test-reader")
                (:file "test-primitives")
                (:file "test-transpiler")
-               (:file "test-command-loop"))
+               (:file "test-command-loop")
+               (:file "test-redisplay"))
   :perform (asdf:test-op (op c)
              (uiop:symbol-call :parachute :test :holomacs/tests)))
+

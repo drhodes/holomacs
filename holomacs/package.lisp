@@ -35,4 +35,5 @@
            #:read-char
            #:commandp
            #:command-execute
-           #:self-insert-command))
+           #:self-insert-command
+           #:redisplay))
