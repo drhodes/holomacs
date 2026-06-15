@@ -677,8 +677,14 @@
                            (elisp-goto-char (nth target-idx starts)))))
                       nil))
 
+(register-primitive 'mark
+                    (lambda ()
+                      (or (buffer-mark *current-buffer*)
+                          (signal-elisp-error 'mark-inactive))))
+
 ;; Bind all registered primitive symbols to their function cells
 (maphash (lambda (sym fn)
            (unless (cl:fboundp sym)
              (setf (fdefinition sym) fn)))
          *primitives*)
+

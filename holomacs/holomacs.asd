@@ -23,7 +23,9 @@
                (:file "test-primitives")
                (:file "test-transpiler")
                (:file "test-command-loop")
-               (:file "test-redisplay"))
+               (:file "test-redisplay")
+               (:file "test-interactive-args"))
   :perform (asdf:test-op (op c)
              (uiop:symbol-call :parachute :test :holomacs/tests)))
+
 

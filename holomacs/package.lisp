@@ -36,4 +36,5 @@
            #:commandp
            #:command-execute
            #:self-insert-command
-           #:redisplay))
+           #:redisplay
+           #:call-interactively))

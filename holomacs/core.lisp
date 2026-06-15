@@ -19,6 +19,7 @@
   name
   (contents (make-array 0 :element-type 'character :adjustable t :fill-pointer 0))
   (point 1)
+  (mark nil)
   (local-vars (make-hash-table :test 'eq))
   (markers nil))
 
@@ -67,10 +68,12 @@
   ;; Initialize nil and t in global env
   (setf (gethash 'nil *global-env*) nil)
   (setf (gethash 't *global-env*) 't)
+  (setf (gethash 'current-prefix-arg *global-env*) nil)
   (setf (cl:symbol-value 'global-map) (list 'keymap))
   ;; Create initial scratch buffer
   (get-buffer-create "*scratch*")
   (set-buffer "*scratch*"))
+
 
 ;;;; =========================================================================
 ;;;; Variable Lookup & Assignment

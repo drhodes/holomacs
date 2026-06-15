@@ -61,18 +61,73 @@
 (setf (get 'self-insert-command :interactive) t)
 (register-primitive 'self-insert-command #'self-insert-command)
 
+(defun call-interactively (cmd &optional recordkeys keys)
+  (declare (ignore recordkeys keys))
+  (let* ((func (if (symbolp cmd) (symbol-function cmd) cmd))
+         (interactive-prop (and (symbolp cmd) (nth-value 1 (get-interactive-prop cmd)))))
+    (cond
+      ((null interactive-prop)
+       (error "Wrong type argument: commandp ~A" cmd))
+      ((or (eq interactive-prop t) (eq interactive-prop :user-interactive))
+       ;; No arguments
+       (funcall func))
+      ((stringp interactive-prop)
+       ;; Parse interactive specification string
+       (let ((args nil)
+             (spec-str interactive-prop)
+             (start 0)
+             (len (cl:length interactive-prop)))
+         (loop while (< start len) do
+               (let* ((code (char spec-str start))
+                      (nl-pos (position #\Newline spec-str :start (1+ start)))
+                      (end (or nl-pos len))
+                      (prompt (subseq spec-str (1+ start) end)))
+                 (setq start (if nl-pos (1+ nl-pos) len))
+                 (case code
+                   (#\r
+                    ;; Region: start & end (min & max of point & mark)
+                    (let ((pt (buffer-point *current-buffer*))
+                          (mk (or (buffer-mark *current-buffer*)
+                                  (signal-elisp-error 'mark-inactive))))
+                      (push (min pt mk) args)
+                      (push (max pt mk) args)))
+                   (#\P
+                    ;; Raw prefix arg
+                    (push (elisp-symbol-value 'current-prefix-arg) args))
+                   ((#\s #\f #\B)
+                    ;; Read string or prompt from stdin
+                    (unless (and (elisp-variable-boundp 'noninteractive)
+                                 (elisp-symbol-value 'noninteractive))
+                      (format *error-output* "~A" prompt)
+                      (force-output *error-output*))
+                    (let ((val (cl:read-line *standard-input* nil nil)))
+                      ;; strip trailing return if any (windows line endings)
+                      (when (and val (> (cl:length val) 0) (char= (char val (1- (cl:length val))) #\Return))
+                        (setf val (subseq val 0 (1- (cl:length val)))))
+                      (push (or val "") args)))
+                   (t
+                    (error "Unsupported interactive code ~S" code)))))
+         (apply func (nreverse args))))
+      (t
+       (error "Invalid interactive property ~S" interactive-prop)))))
+
+(register-primitive 'call-interactively #'call-interactively)
+
 (defun command-execute (cmd &optional record)
   (declare (ignore record))
   (let ((prev this-command))
     (setq this-command cmd)
-    (let ((func (if (symbolp cmd)
-                     (symbol-function cmd)
-                     cmd)))
-      (funcall func))
+    (if (commandp cmd)
+        (call-interactively cmd)
+        (let ((func (if (symbolp cmd)
+                         (symbol-function cmd)
+                         cmd)))
+          (funcall func)))
     (setq last-command prev))
   nil)
 
 (register-primitive 'command-execute #'command-execute)
+
 
 (defun command-loop ()
   (handler-case
