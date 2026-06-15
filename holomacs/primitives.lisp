@@ -682,6 +682,59 @@
                       (or (buffer-mark *current-buffer*)
                           (signal-elisp-error 'mark-inactive))))
 
+(register-primitive 'bobp
+                    (lambda ()
+                      ;; BolpBobpReq
+                      (if (= (buffer-point *current-buffer*) 1) 't nil)))
+
+(register-primitive 'bolp
+                    (lambda ()
+                      ;; BolpBobpReq
+                      (let* ((buf *current-buffer*)
+                             (pt (buffer-point buf)))
+                        (if (or (= pt 1)
+                                (char= (char (buffer-contents buf) (- pt 2)) #\Newline))
+                            't
+                            nil))))
+
+(register-primitive 'eobp
+                    (lambda ()
+                      ;; EolpEobpReq
+                      (if (>= (buffer-point *current-buffer*) (1+ (length (buffer-contents *current-buffer*)))) 't nil)))
+
+(register-primitive 'eolp
+                    (lambda ()
+                      ;; EolpEobpReq
+                      (let* ((buf *current-buffer*)
+                             (contents (buffer-contents buf))
+                             (len (length contents))
+                             (pt (buffer-point buf)))
+                        (if (or (>= pt (1+ len))
+                                (char= (char contents (1- pt)) #\Newline))
+                            't
+                            nil))))
+
+(register-primitive 'char-after
+                    (lambda (&optional pos)
+                      ;; CharAfterReq
+                      (let* ((buf *current-buffer*)
+                             (resolved-pos (if pos (resolve-position pos) (buffer-point buf)))
+                             (contents (buffer-contents buf)))
+                        (if (and (>= resolved-pos 1) (<= resolved-pos (length contents)))
+                            (char-code (char contents (1- resolved-pos)))
+                            nil))))
+
+(register-primitive 'buffer-string
+                    (lambda ()
+                      ;; BufferStringSizeReq
+                      (coerce (buffer-contents *current-buffer*) 'string)))
+
+(register-primitive 'buffer-size
+                    (lambda ()
+                      ;; BufferStringSizeReq
+                      (length (buffer-contents *current-buffer*))))
+
+
 ;; Bind all registered primitive symbols to their function cells
 (maphash (lambda (sym fn)
            (unless (cl:fboundp sym)

@@ -38,4 +38,12 @@
            #:self-insert-command
            #:redisplay
            #:call-interactively
-           #:read-key-sequence))
+           #:read-key-sequence
+           #:command-loop
+           #:bobp
+           #:bolp
+           #:eobp
+           #:eolp
+           #:char-after
+           #:buffer-string
+           #:buffer-size))

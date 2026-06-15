@@ -81,3 +81,65 @@
     (is = 42 (h:elisp-symbol-value 'test-var-xyz))
     ;; Void variable signals an error
     (fail (h:elisp-symbol-value 'definitely-not-bound-xyz))))
+
+;;; =========================================================================
+;;; Primitive Coverage (PrimitiveCoverageUnitTestReq)
+;;; =========================================================================
+
+(define-test primitive-coverage-bobp-bolp
+  (with-fresh-state
+    (h:insert "line 1
+line 2
+line 3")
+    ;; Point is at the end. Move to start.
+    (h::elisp-goto-char 1)
+    (is eq t (h::bobp))
+    (is eq t (h::bolp))
+    
+    ;; Move to middle of line 1
+    (h::elisp-goto-char 3)
+    (is eq nil (h::bobp))
+    (is eq nil (h::bolp))
+    
+    ;; Move to beginning of line 2 (char 8)
+    (h::elisp-goto-char 8)
+    (is eq nil (h::bobp))
+    (is eq t (h::bolp))))
+
+(define-test primitive-coverage-eobp-eolp
+  (with-fresh-state
+    (h:insert "abc
+def")
+    ;; At end of buffer (point is 8)
+    (is eq t (h::eobp))
+    (is eq t (h::eolp))
+    
+    ;; Move to middle of line 1
+    (h::elisp-goto-char 2)
+    (is eq nil (h::eobp))
+    (is eq nil (h::eolp))
+    
+    ;; Move to end of line 1 (char 4, right before newline)
+    (h::elisp-goto-char 4)
+    (is eq nil (h::eobp))
+    (is eq t (h::eolp))))
+
+(define-test primitive-coverage-char-after
+  (with-fresh-state
+    (h:insert "xyz")
+    (is = 120 (h::char-after 1)) ; 'x'
+    (is = 121 (h::char-after 2)) ; 'y'
+    (is = 122 (h::char-after 3)) ; 'z'
+    (is eq nil (h::char-after 4)) ; past eob
+    ;; Implicit point
+    (h::elisp-goto-char 2)
+    (is = 121 (h::char-after))))
+
+(define-test primitive-coverage-buffer-string-size
+  (with-fresh-state
+    (is string= "" (h::buffer-string))
+    (is = 0 (h::buffer-size))
+    (h:insert "hello")
+    (is string= "hello" (h::buffer-string))
+    (is = 5 (h::buffer-size))))
+
