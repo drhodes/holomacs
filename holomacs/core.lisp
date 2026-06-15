@@ -20,7 +20,7 @@
   (contents (make-array 0 :element-type 'character :adjustable t :fill-pointer 0))
   (point 1)
   (mark nil)
-  (local-vars (make-hash-table :test 'eq))
+  (local-vars (cl:make-hash-table :test 'eq))
   (markers nil))
 
 (defstruct (elisp-marker (:conc-name marker-)
@@ -50,7 +50,7 @@
 
 (defvar *buffers* nil)
 (defvar *current-buffer* nil)
-(defvar *global-env* (make-hash-table :test 'eq))
+(defvar *global-env* (cl:make-hash-table :test 'eq))
 (defvar *dynamic-env* nil) ; Alist of (symbol . value)
 (defvar *noninteractive-need-newline* nil)
 
@@ -66,9 +66,9 @@
   (clrhash *global-env*)
   (setf *elisp-output* (make-string-output-stream))
   ;; Initialize nil and t in global env
-  (setf (gethash 'nil *global-env*) nil)
-  (setf (gethash 't *global-env*) 't)
-  (setf (gethash 'current-prefix-arg *global-env*) nil)
+  (setf (cl:gethash 'nil *global-env*) nil)
+  (setf (cl:gethash 't *global-env*) 't)
+  (setf (cl:gethash 'current-prefix-arg *global-env*) nil)
   (setf (cl:symbol-value 'global-map) (list 'keymap))
   ;; Create initial scratch buffer
   (get-buffer-create "*scratch*")
@@ -81,27 +81,27 @@
 
 (defun elisp-variable-boundp (var)
   (or (cl:assoc var *dynamic-env* :test #'eq)
-      (and *current-buffer* (nth-value 1 (gethash var (buffer-local-vars *current-buffer*))))
+      (and *current-buffer* (nth-value 1 (cl:gethash var (buffer-local-vars *current-buffer*))))
       (cl:boundp var)
-      (nth-value 1 (gethash var *global-env*))))
+      (nth-value 1 (cl:gethash var *global-env*))))
 
 (defun elisp-symbol-value (var)
   (let ((dyn-binding (cl:assoc var *dynamic-env* :test #'eq)))
     (if dyn-binding
         (cdr dyn-binding)
         (if *current-buffer*
-            (multiple-value-bind (val found) (gethash var (buffer-local-vars *current-buffer*))
+            (multiple-value-bind (val found) (cl:gethash var (buffer-local-vars *current-buffer*))
               (if found
                   val
                   (if (cl:boundp var)
                       (cl:symbol-value var)
-                      (multiple-value-bind (gval gfound) (gethash var *global-env*)
+                      (multiple-value-bind (gval gfound) (cl:gethash var *global-env*)
                         (if gfound
                             gval
                             (signal-elisp-error 'void-variable var))))))
             (if (cl:boundp var)
                 (cl:symbol-value var)
-                (multiple-value-bind (gval gfound) (gethash var *global-env*)
+                (multiple-value-bind (gval gfound) (cl:gethash var *global-env*)
                   (if gfound
                       gval
                       (signal-elisp-error 'void-variable var))))))))
@@ -111,10 +111,10 @@
     (if dyn-binding
         (setf (cdr dyn-binding) val)
         (if *current-buffer*
-            (multiple-value-bind (lval lfound) (gethash var (buffer-local-vars *current-buffer*))
+            (multiple-value-bind (lval lfound) (cl:gethash var (buffer-local-vars *current-buffer*))
               (declare (ignore lval))
               (if lfound
-                  (setf (gethash var (buffer-local-vars *current-buffer*)) val)
+                  (setf (cl:gethash var (buffer-local-vars *current-buffer*)) val)
                   (setf (cl:symbol-value var) val)))
             (setf (cl:symbol-value var) val))))
   val)
@@ -142,10 +142,10 @@
 ;;;; Elisp Evaluator / Interpreter
 ;;;; =========================================================================
 
-(defvar *primitives* (make-hash-table :test 'eq))
+(defvar *primitives* (cl:make-hash-table :test 'eq))
 
 (defun register-primitive (name fn)
-  (setf (gethash name *primitives*) fn))
+  (setf (cl:gethash name *primitives*) fn))
 
 (defun eval-elisp (expr)
   (cond
@@ -234,7 +234,7 @@
                 (eval-elisp form)))))
          (t
           ;; Normal function call
-          (let ((prim (gethash head *primitives*)))
+          (let ((prim (cl:gethash head *primitives*)))
             (if prim
                 (apply prim (mapcar #'eval-elisp args))
                 (signal-elisp-error 'void-function head)))))))

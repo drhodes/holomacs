@@ -2,7 +2,7 @@
   (:use #:cl)
   (:shadow #:equal #:length #:member #:assoc #:append #:print
            #:symbol-value #:symbol-function #:boundp #:fboundp #:intern #:make-symbol
-           #:read-char)
+           #:read-char #:make-hash-table #:gethash #:remhash)
   (:export ;; Public API
            #:run-file
            #:run-string
@@ -54,5 +54,19 @@
            #:search-forward
            #:search-backward
            #:skip-chars-forward
-           #:skip-chars-backward))
+           #:skip-chars-backward
+           ;; Case conversion
+           #:downcase
+           #:upcase
+           #:capitalize
+           #:downcase-region
+           #:upcase-region
+           #:capitalize-region
+           ;; regex looking-at
+           #:looking-at
+           ;; hash tables
+           #:make-hash-table
+           #:gethash
+           #:puthash
+           #:remhash))
 

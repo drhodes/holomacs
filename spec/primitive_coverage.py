@@ -59,11 +59,31 @@ class SkipCharsReq(Req):
     '''
 
 
+class CasePrimitivesReq(Req):
+    r'''The engine must implement case manipulation primitives.
+    - `downcase`, `upcase`, and `capitalize` for string case translation.
+    - `downcase-region`, `upcase-region`, and `capitalize-region` to modify case of buffer regions.
+    '''
+
+
+class LookingAtReq(Req):
+    r'''The engine must implement `looking-at` primitive.
+    - It matches a regular expression against the buffer text immediately following the point.
+    '''
+
+
+class HashTablePrimitivesReq(Req):
+    r'''The engine must implement hash table primitives.
+    - `make-hash-table`, `puthash`, `gethash`, and `remhash` for hash table lifecycle and key-value lookups.
+    '''
+
+
 class PrimitiveCoverageUnitTestReq(Req):
-    r'''The unit tests must verify `bolp`, `bobp`, `eolp`, `eobp`, `char-after`, `buffer-size`, `buffer-string`, `string-match`, `match-beginning`, `match-end`, `replace-match`, `search-forward`, `search-backward`, `skip-chars-forward`, and `skip-chars-backward`.
+    r'''The unit tests must verify `bolp`, `bobp`, `eolp`, `eobp`, `char-after`, `buffer-size`, `buffer-string`, `string-match`, `match-beginning`, `match-end`, `replace-match`, `search-forward`, `search-backward`, `skip-chars-forward`, `skip-chars-backward`, case conversion, `looking-at`, and hash tables.
     '''
 
 
 class PrimitiveCoverageFeature(Feat):
     r'''Primitive Coverage feature grouping.'''
+
 

@@ -247,15 +247,15 @@
 ;; Local variables
 (register-primitive 'make-local-variable
                     (lambda (var)
-                      (unless (nth-value 1 (gethash var (buffer-local-vars *current-buffer*)))
-                        (setf (gethash var (buffer-local-vars *current-buffer*))
+                      (unless (nth-value 1 (cl:gethash var (buffer-local-vars *current-buffer*)))
+                        (setf (cl:gethash var (buffer-local-vars *current-buffer*))
                               (elisp-symbol-value var)))
                       var))
 
 (register-primitive 'make-variable-buffer-local
                     (lambda (var)
-                      (unless (nth-value 1 (gethash var (buffer-local-vars *current-buffer*)))
-                        (setf (gethash var (buffer-local-vars *current-buffer*))
+                      (unless (nth-value 1 (cl:gethash var (buffer-local-vars *current-buffer*)))
+                        (setf (cl:gethash var (buffer-local-vars *current-buffer*))
                               (elisp-symbol-value var)))
                       var))
 
@@ -348,8 +348,8 @@
 
 (defun symbol-function (symbol)
   (cond
-    ((gethash symbol *primitives*)
-     (gethash symbol *primitives*))
+    ((cl:gethash symbol *primitives*)
+     (cl:gethash symbol *primitives*))
     ((cl:fboundp symbol)
      (fdefinition symbol))
     (t
@@ -358,7 +358,7 @@
 (register-primitive 'symbol-function #'symbol-function)
 
 (defun fboundp (symbol)
-  (if (or (gethash symbol *primitives*)
+  (if (or (cl:gethash symbol *primitives*)
           (cl:fboundp symbol))
       't
       nil))
@@ -424,7 +424,7 @@
                           (when stream
                             (let ((contents (make-string (file-length stream))))
                               (read-sequence contents stream)
-                              (apply (gethash 'insert *primitives*) (list contents)))))
+                              (apply (cl:gethash 'insert *primitives*) (list contents)))))
                         (setf (buffer-point *current-buffer*) old-point))
                       nil))
 
@@ -862,10 +862,132 @@
                         count)))
 
 
+(register-primitive 'downcase
+                    (lambda (obj)
+                      ;; CasePrimitivesReq
+                      (cond
+                        ((stringp obj) (string-downcase obj))
+                        ((integerp obj) (char-code (char-downcase (code-char obj))))
+                        (t (error "Wrong type argument: stringp or characterp ~S" obj)))))
+
+(register-primitive 'upcase
+                    (lambda (obj)
+                      ;; CasePrimitivesReq
+                      (cond
+                        ((stringp obj) (string-upcase obj))
+                        ((integerp obj) (char-code (char-upcase (code-char obj))))
+                        (t (error "Wrong type argument: stringp or characterp ~S" obj)))))
+
+(register-primitive 'capitalize
+                    (lambda (obj)
+                      ;; CasePrimitivesReq
+                      (cond
+                        ((stringp obj) (string-capitalize obj))
+                        ((integerp obj) (char-code (char-upcase (code-char obj))))
+                        (t (error "Wrong type argument: stringp or characterp ~S" obj)))))
+
+(register-primitive 'downcase-region
+                    (lambda (start end)
+                      ;; CasePrimitivesReq
+                      (let* ((buf *current-buffer*)
+                             (s-pos (resolve-position start))
+                             (e-pos (resolve-position end))
+                             (min-pos (min s-pos e-pos))
+                             (max-pos (max s-pos e-pos))
+                             (old-text (buffer-substring min-pos max-pos))
+                             (new-text (string-downcase old-text)))
+                        (delete-buffer-region buf min-pos max-pos)
+                        (elisp-goto-char min-pos)
+                        (insert new-text)
+                        nil)))
+
+(register-primitive 'upcase-region
+                    (lambda (start end)
+                      ;; CasePrimitivesReq
+                      (let* ((buf *current-buffer*)
+                             (s-pos (resolve-position start))
+                             (e-pos (resolve-position end))
+                             (min-pos (min s-pos e-pos))
+                             (max-pos (max s-pos e-pos))
+                             (old-text (buffer-substring min-pos max-pos))
+                             (new-text (string-upcase old-text)))
+                        (delete-buffer-region buf min-pos max-pos)
+                        (elisp-goto-char min-pos)
+                        (insert new-text)
+                        nil)))
+
+(register-primitive 'capitalize-region
+                    (lambda (start end)
+                      ;; CasePrimitivesReq
+                      (let* ((buf *current-buffer*)
+                             (s-pos (resolve-position start))
+                             (e-pos (resolve-position end))
+                             (min-pos (min s-pos e-pos))
+                             (max-pos (max s-pos e-pos))
+                             (old-text (buffer-substring min-pos max-pos))
+                             (new-text (string-capitalize old-text)))
+                        (delete-buffer-region buf min-pos max-pos)
+                        (elisp-goto-char min-pos)
+                        (insert new-text)
+                        nil)))
+
+(register-primitive 'looking-at
+                    (lambda (regexp)
+                      ;; LookingAtReq
+                      (let* ((buf *current-buffer*)
+                             (contents (buffer-contents buf))
+                             (pt (buffer-point buf))
+                             (sub (subseq contents (1- pt)))
+                             (translated-re (translate-elisp-regex regexp))
+                             (anchored-re (concatenate 'string "^" translated-re)))
+                        (multiple-value-bind (m-start m-end reg-starts reg-ends)
+                            (cl-ppcre:scan anchored-re sub)
+                          (if m-start
+                              (progn
+                                (let ((offset (1- pt)))
+                                  (setq *last-match-start*
+                                        (coerce (cons (+ m-start offset 1)
+                                                      (mapcar (lambda (x) (and x (+ x offset 1))) (coerce reg-starts 'list)))
+                                                'vector))
+                                  (setq *last-match-end*
+                                        (coerce (cons (+ m-end offset 1)
+                                                      (mapcar (lambda (x) (and x (+ x offset 1))) (coerce reg-ends 'list)))
+                                                'vector)))
+                                't)
+                              (progn
+                                (setq *last-match-start* nil)
+                                (setq *last-match-end* nil)
+                                nil))))))
+
+(register-primitive 'make-hash-table
+                    (lambda (&rest args)
+                      (declare (ignore args))
+                      ;; HashTablePrimitivesReq
+                      (cl:make-hash-table :test 'cl:equal)))
+
+(register-primitive 'gethash
+                    (lambda (key table &optional default)
+                      ;; HashTablePrimitivesReq
+                      (cl:gethash key table default)))
+
+(register-primitive 'puthash
+                    (lambda (key val table)
+                      ;; HashTablePrimitivesReq
+                      (setf (cl:gethash key table) val)
+                      val))
+
+(register-primitive 'remhash
+                    (lambda (key table)
+                      ;; HashTablePrimitivesReq
+                      (cl:remhash key table)
+                      nil))
+
+
 ;; Bind all registered primitive symbols to their function cells
-(maphash (lambda (sym fn)
-           (unless (cl:fboundp sym)
-             (setf (fdefinition sym) fn)))
-         *primitives*)
+(cl:maphash (lambda (sym fn)
+              (unless (cl:fboundp sym)
+                (setf (fdefinition sym) fn)))
+            *primitives*)
+
 
 

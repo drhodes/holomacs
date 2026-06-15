@@ -182,5 +182,41 @@ def")
     (h::skip-chars-backward " ")
     (is = 9 (h:point))))
 
+(define-test primitive-coverage-case-conversion
+  (with-fresh-state
+    (is string= "hello" (h:downcase "HeLlO"))
+    (is string= "WORLD" (h:upcase "world"))
+    (is string= "Hello World" (h:capitalize "hello world"))
+    (h:insert "abcDEF")
+    (h:downcase-region 1 4)
+    (is string= "abcDEF" (h:buffer-string))
+    (h:downcase-region 4 7)
+    (is string= "abcdef" (h:buffer-string))
+    (h:upcase-region 1 7)
+    (is string= "ABCDEF" (h:buffer-string))
+    (h::elisp-goto-char 1)
+    (h:insert "hello ")
+    (h:capitalize-region 1 7)
+    (is string= "Hello ABCDEF" (h:buffer-string))))
+ 
+(define-test primitive-coverage-looking-at
+  (with-fresh-state
+    (h:insert "hello world")
+    (h::elisp-goto-char 1)
+    (is eq t (h:looking-at "he..o"))
+    (is eq nil (h:looking-at "world"))
+    (h::elisp-goto-char 7)
+    (is eq t (h:looking-at "wo..d"))))
+ 
+(define-test primitive-coverage-hash-tables
+  (with-fresh-state
+    (let ((tbl (h:make-hash-table)))
+      (is eq nil (h:gethash 'foo tbl))
+      (h:puthash 'foo 42 tbl)
+      (is = 42 (h:gethash 'foo tbl))
+      (h:remhash 'foo tbl)
+      (is eq nil (h:gethash 'foo tbl)))))
+
+
 
 
