@@ -46,4 +46,13 @@
            #:eolp
            #:char-after
            #:buffer-string
-           #:buffer-size))
+           #:buffer-size
+           #:string-match
+           #:match-beginning
+           #:match-end
+           #:replace-match
+           #:search-forward
+           #:search-backward
+           #:skip-chars-forward
+           #:skip-chars-backward))
+

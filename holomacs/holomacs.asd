@@ -2,7 +2,9 @@
   :description "Holomacs Common Lisp Proof of Concept Engine"
   :author "Antigravity"
   :license "MIT"
+  :depends-on (#:cl-ppcre)
   :serial t
+
   :components ((:file "package")
                (:file "core")
                (:file "transpiler")

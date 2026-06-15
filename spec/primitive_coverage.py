@@ -33,10 +33,37 @@ class BufferStringSizeReq(Req):
     '''
 
 
+class RegexSearchMatchReq(Req):
+    r'''The engine must implement regex search and match tracking primitives.
+    - `string-match` matches a regular expression against a string.
+    - `match-beginning` and `match-end` return the start and end offsets of the last match or its subexpressions.
+    '''
+
+
+class ReplaceMatchReq(Req):
+    r'''The engine must implement `replace-match` primitive.
+    - It replaces the matched text from the last regex/string match with new text.
+    '''
+
+
+class SimpleSearchReq(Req):
+    r'''The engine must implement `search-forward` and `search-backward` primitives.
+    - They search for a literal string in the current buffer from the point.
+    - They move point to the end of the match (or start for backward) and return the new point on success, or signal error/return nil on failure depending on arguments.
+    '''
+
+
+class SkipCharsReq(Req):
+    r'''The engine must implement `skip-chars-forward` and `skip-chars-backward` primitives.
+    - They move point past characters belonging to a specified set.
+    '''
+
+
 class PrimitiveCoverageUnitTestReq(Req):
-    r'''The unit tests must verify `bolp`, `bobp`, `eolp`, `eobp`, `char-after`, `buffer-size`, and `buffer-string`.
+    r'''The unit tests must verify `bolp`, `bobp`, `eolp`, `eobp`, `char-after`, `buffer-size`, `buffer-string`, `string-match`, `match-beginning`, `match-end`, `replace-match`, `search-forward`, `search-backward`, `skip-chars-forward`, and `skip-chars-backward`.
     '''
 
 
 class PrimitiveCoverageFeature(Feat):
     r'''Primitive Coverage feature grouping.'''
+

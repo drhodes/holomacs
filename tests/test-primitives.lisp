@@ -143,3 +143,44 @@ def")
     (is string= "hello" (h::buffer-string))
     (is = 5 (h::buffer-size))))
 
+(define-test primitive-coverage-regex-match
+  (with-fresh-state
+    (is = 2 (h::string-match "c" "abcdef"))
+    (is eq nil (h::string-match "z" "abcdef"))
+    (is = 0 (h::string-match "\\(ab\\)\\(cd\\)" "abcdef"))
+    (is = 0 (h::match-beginning 0))
+    (is = 4 (h::match-end 0))
+    (is = 0 (h::match-beginning 1))
+    (is = 2 (h::match-end 1))
+    (is = 2 (h::match-beginning 2))
+    (is = 4 (h::match-end 2))))
+
+(define-test primitive-coverage-replace-match
+  (with-fresh-state
+    (h::string-match "b.d" "abcdef")
+    (is string= "aXYZef" (h::replace-match "XYZ" nil nil "abcdef"))))
+
+(define-test primitive-coverage-simple-search
+  (with-fresh-state
+    (h:insert "hello world hello")
+    (h::elisp-goto-char 1)
+    (is = 6 (h::search-forward "hello"))
+    (is = 6 (h:point))
+    (is = 18 (h::search-forward "hello"))
+    (is = 18 (h:point))
+    (is = 13 (h::search-backward "hello"))
+    (is = 13 (h:point))))
+
+(define-test primitive-coverage-skip-chars
+  (with-fresh-state
+    (h:insert "   hello")
+    (h::elisp-goto-char 1)
+    (h::skip-chars-forward " ")
+    (is = 4 (h:point))
+    (h::elisp-goto-char 9)
+    (h:insert "   ")
+    (h::skip-chars-backward " ")
+    (is = 9 (h:point))))
+
+
+

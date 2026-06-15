@@ -735,9 +735,137 @@
                       (length (buffer-contents *current-buffer*))))
 
 
+(defvar *last-match-start* nil)
+(defvar *last-match-end* nil)
+(declaim (special *last-match-start* *last-match-end*))
+
+(defun translate-elisp-regex (re-str)
+  (let ((res re-str))
+    (setq res (cl-ppcre:regex-replace-all "\\\\\\(" res "("))
+    (setq res (cl-ppcre:regex-replace-all "\\\\\\)" res ")"))
+    (setq res (cl-ppcre:regex-replace-all "\\\\\\|" res "|"))
+    res))
+
+(register-primitive 'string-match
+                    (lambda (regexp string &optional start)
+                      ;; RegexSearchMatchReq
+                      (let* ((translated-re (translate-elisp-regex regexp))
+                             (start-pos (or start 0)))
+                        (multiple-value-bind (m-start m-end reg-starts reg-ends)
+                            (cl-ppcre:scan translated-re string :start start-pos)
+                          (if m-start
+                              (progn
+                                (setq *last-match-start* (coerce (cons m-start (coerce reg-starts 'list)) 'vector))
+                                (setq *last-match-end* (coerce (cons m-end (coerce reg-ends 'list)) 'vector))
+                                m-start)
+                              (progn
+                                (setq *last-match-start* nil)
+                                (setq *last-match-end* nil)
+                                nil))))))
+
+(register-primitive 'match-beginning
+                    (lambda (subexp)
+                      ;; RegexSearchMatchReq
+                      (if (and *last-match-start* (< subexp (length *last-match-start*)))
+                          (aref *last-match-start* subexp)
+                          nil)))
+
+(register-primitive 'match-end
+                    (lambda (subexp)
+                      ;; RegexSearchMatchReq
+                      (if (and *last-match-end* (< subexp (length *last-match-end*)))
+                          (aref *last-match-end* subexp)
+                          nil)))
+
+(register-primitive 'replace-match
+                    (lambda (newtext &optional fixedcase literal string subexp)
+                      (declare (ignore fixedcase literal subexp))
+                      ;; ReplaceMatchReq
+                      (if string
+                          (let* ((m-start (aref *last-match-start* 0))
+                                 (m-end (aref *last-match-end* 0)))
+                            (concat (subseq string 0 m-start)
+                                    newtext
+                                    (subseq string m-end)))
+                          (let* ((m-start (aref *last-match-start* 0))
+                                 (m-end (aref *last-match-end* 0)))
+                            (delete-buffer-region *current-buffer* (1+ m-start) (1+ m-end))
+                            (elisp-goto-char (1+ m-start))
+                            (insert newtext)
+                            nil))))
+
+(register-primitive 'search-forward
+                    (lambda (str &optional limit noerror repeat)
+                      (declare (ignore limit repeat))
+                      ;; SimpleSearchReq
+                      (let* ((buf *current-buffer*)
+                             (contents (buffer-contents buf))
+                             (pt (buffer-point buf))
+                             (pos (search str contents :start2 (1- pt))))
+                        (if pos
+                            (let ((new-pt (+ pos (length str) 1)))
+                              (elisp-goto-char new-pt)
+                              new-pt)
+                            (if noerror
+                                nil
+                                (error "Search failed: ~S" str))))))
+
+(register-primitive 'search-backward
+                    (lambda (str &optional limit noerror repeat)
+                      (declare (ignore limit repeat))
+                      ;; SimpleSearchReq
+                      (let* ((buf *current-buffer*)
+                             (contents (buffer-contents buf))
+                             (pt (buffer-point buf))
+                             (pos (search str contents :from-end t :end2 (1- pt))))
+                        (if pos
+                            (let ((new-pt (1+ pos)))
+                              (elisp-goto-char new-pt)
+                              new-pt)
+                            (if noerror
+                                nil
+                                (error "Search failed: ~S" str))))))
+
+(register-primitive 'skip-chars-forward
+                    (lambda (char-set &optional limit)
+                      (declare (ignore limit))
+                      ;; SkipCharsReq
+                      (let* ((buf *current-buffer*)
+                             (contents (buffer-contents buf))
+                             (len (length contents))
+                             (pt (buffer-point buf))
+                             (count 0))
+                        (loop while (<= pt len)
+                              for ch = (char contents (1- pt))
+                              while (position ch char-set)
+                              do (progn
+                                   (incf pt)
+                                   (incf count)))
+                        (elisp-goto-char pt)
+                        count)))
+
+(register-primitive 'skip-chars-backward
+                    (lambda (char-set &optional limit)
+                      (declare (ignore limit))
+                      ;; SkipCharsReq
+                      (let* ((buf *current-buffer*)
+                             (contents (buffer-contents buf))
+                             (pt (buffer-point buf))
+                             (count 0))
+                        (loop while (> pt 1)
+                              for ch = (char contents (- pt 2))
+                              while (position ch char-set)
+                              do (progn
+                                   (decf pt)
+                                   (incf count)))
+                        (elisp-goto-char pt)
+                        count)))
+
+
 ;; Bind all registered primitive symbols to their function cells
 (maphash (lambda (sym fn)
            (unless (cl:fboundp sym)
              (setf (fdefinition sym) fn)))
          *primitives*)
+
 
