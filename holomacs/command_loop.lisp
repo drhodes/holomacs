@@ -146,6 +146,7 @@
 (defun command-loop ()
   (handler-case
       (loop
+        (redisplay)
         (multiple-value-bind (cmd key-seq) (read-key-sequence global-map)
           ;; Track full key sequence (KeySequenceTrackingReq)
           (setq *this-command-keys* key-seq)

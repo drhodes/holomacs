@@ -64,3 +64,9 @@
           (cl:format *error-output* "Error during execution: ~A~%" err)
           (uiop:quit 1)))))
   (write-string (get-output-stream-string *elisp-output*)))
+
+(defun run-editor ()
+  "Main entry point for running the Holomacs interactive editor in a terminal."
+  (init-elisp-state)
+  (with-raw-terminal
+    (command-loop)))

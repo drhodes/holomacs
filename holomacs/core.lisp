@@ -70,6 +70,8 @@
   (setf (cl:gethash 't *global-env*) 't)
   (setf (cl:gethash 'current-prefix-arg *global-env*) nil)
   (setf (cl:symbol-value 'global-map) (list 'keymap))
+  (loop for i from 32 to 126 do
+        (define-key (cl:symbol-value 'global-map) (cl:string (code-char i)) 'self-insert-command))
   ;; Create initial scratch buffer
   (get-buffer-create "*scratch*")
   (set-buffer "*scratch*"))

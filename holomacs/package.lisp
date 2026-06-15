@@ -8,6 +8,7 @@
   (:export ;; Public API
            #:run-file
            #:run-string
+           #:run-editor
            #:transpile-elisp
            #:compile-elisp-form
            #:load-elisp-file

@@ -124,3 +124,64 @@
           (is eq nil cmd)
           (is string= input-str key-seq))))))
 
+;;; =========================================================================
+;;; Editor & Default Keybindings Tests
+;;; =========================================================================
+
+(define-test default-keybindings-initialized
+  "Test that printable ASCII characters (32 to 126) are bound to self-insert-command."
+  (h:init-elisp-state)
+  (loop for i from 32 to 126 do
+        (let* ((key-str (h:char-to-string i))
+               (binding (h:lookup-key h::global-map key-str)))
+          (is eq 'h:self-insert-command binding))))
+
+(define-test command-loop-calls-redisplay
+  "Test that command-loop calls redisplay before reading keys."
+  (h:init-elisp-state)
+  (let ((old-redisplay (cl:symbol-function 'h:redisplay))
+        (old-read-key (cl:symbol-function 'h::read-key-sequence))
+        (redisplay-called-count 0))
+    (unwind-protect
+         (progn
+           (setf (cl:symbol-function 'h:redisplay)
+                 (lambda () (incf redisplay-called-count)))
+           (setf (cl:symbol-function 'h::read-key-sequence)
+                 (lambda (map)
+                   (declare (cl:ignore map))
+                   (cl:error "End of input stream")))
+           (h::command-loop)
+           (is = 1 redisplay-called-count))
+      (setf (cl:symbol-function 'h:redisplay) old-redisplay)
+      (setf (cl:symbol-function 'h::read-key-sequence) old-read-key))))
+
+(define-test run-editor-initializes-state-and-runs-loop
+  "Test that run-editor calls init-elisp-state, wraps in raw mode, and starts command loop."
+  (let ((old-init (cl:symbol-function 'h:init-elisp-state))
+        (old-raw (cl:symbol-function 'h::enter-raw-mode))
+        (old-sane (cl:symbol-function 'h::exit-raw-mode))
+        (old-loop (cl:symbol-function 'h::command-loop))
+        (init-called nil)
+        (raw-called nil)
+        (sane-called nil)
+        (loop-called nil))
+    (unwind-protect
+         (progn
+           (setf (cl:symbol-function 'h:init-elisp-state)
+                 (lambda () (setf init-called t)))
+           (setf (cl:symbol-function 'h::enter-raw-mode)
+                 (lambda () (setf raw-called t)))
+           (setf (cl:symbol-function 'h::exit-raw-mode)
+                 (lambda () (setf sane-called t)))
+           (setf (cl:symbol-function 'h::command-loop)
+                 (lambda () (setf loop-called t)))
+           (h::run-editor)
+           (is eq t init-called)
+           (is eq t raw-called)
+           (is eq t loop-called)
+           (is eq t sane-called))
+      (setf (cl:symbol-function 'h:init-elisp-state) old-init)
+      (setf (cl:symbol-function 'h::enter-raw-mode) old-raw)
+      (setf (cl:symbol-function 'h::exit-raw-mode) old-sane)
+      (setf (cl:symbol-function 'h::command-loop) old-loop))))
+
