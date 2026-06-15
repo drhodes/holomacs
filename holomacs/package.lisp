@@ -37,4 +37,5 @@
            #:command-execute
            #:self-insert-command
            #:redisplay
-           #:call-interactively))
+           #:call-interactively
+           #:read-key-sequence))

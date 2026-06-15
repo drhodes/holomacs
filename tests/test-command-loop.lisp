@@ -94,3 +94,33 @@
     (h:self-insert-command)
     (is = (1+ pt-before) (h:point))
     (is string= "x" (h:buffer-substring 1 2))))
+
+;;; =========================================================================
+;;; keymap routing and prefix keys (KeymapRoutingUnitTestReq)
+;;; =========================================================================
+
+(define-test keymap-routing-prefix
+  "Test that routing descends into prefix keymaps and returns the correct binding."
+  (h:init-elisp-state)
+  (let ((sub-map (h:make-sparse-keymap)))
+    (h:define-key h::global-map (h:char-to-string 24) sub-map) ; C-x
+    (h:define-key sub-map (h:char-to-string 6) 'mock-find-file) ; C-f
+    ;; Mock input of two keys: C-x (24) and C-f (6)
+    (let ((input-str (coerce (list (code-char 24) (code-char 6)) 'string)))
+      (with-input-from-string (*standard-input* input-str)
+        (multiple-value-bind (cmd key-seq) (h::read-key-sequence h::global-map)
+          (is eq 'mock-find-file cmd)
+          (is string= input-str key-seq))))))
+
+(define-test keymap-routing-unbound
+  "Test that routing returns nil for unbound sequences."
+  (h:init-elisp-state)
+  (let ((sub-map (h:make-sparse-keymap)))
+    (h:define-key h::global-map (h:char-to-string 24) sub-map) ; C-x
+    ;; Mock input of C-x (24) and C-g (7) (unbound in sub-map)
+    (let ((input-str (coerce (list (code-char 24) (code-char 7)) 'string)))
+      (with-input-from-string (*standard-input* input-str)
+        (multiple-value-bind (cmd key-seq) (h::read-key-sequence h::global-map)
+          (is eq nil cmd)
+          (is string= input-str key-seq))))))
+

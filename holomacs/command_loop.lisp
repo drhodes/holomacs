@@ -129,18 +129,32 @@
 (register-primitive 'command-execute #'command-execute)
 
 
+(defun read-key-sequence (map)
+  "Recursively read keys and resolve prefix keymaps. (PrefixKeymapReq)"
+  (let* ((char (read-char))
+         (key-str (char-to-string char))
+         (binding (lookup-key map key-str)))
+    (cond
+      ((null binding)
+       (values nil key-str))
+      ((and (consp binding) (eq (car binding) 'keymap))
+       (multiple-value-bind (cmd sub-seq) (read-key-sequence binding)
+         (values cmd (concat key-str sub-seq))))
+      (t
+       (values binding key-str)))))
+
 (defun command-loop ()
   (handler-case
       (loop
-        (let* ((char (read-char))
-               (key-str (char-to-string char))
-               (cmd (lookup-key global-map key-str)))
-          (setq *this-command-keys* key-str)
+        (multiple-value-bind (cmd key-seq) (read-key-sequence global-map)
+          ;; Track full key sequence (KeySequenceTrackingReq)
+          (setq *this-command-keys* key-seq)
           (if cmd
               (command-execute cmd)
-              (error "Unbound key: ~A" key-str))))
+              (error "Unbound key: ~A" key-seq))))
     (error (err)
       (unless (search "End of input stream" (format nil "~A" err))
         (error err)))))
 
 (register-primitive 'command-loop #'command-loop)
+

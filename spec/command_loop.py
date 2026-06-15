@@ -39,5 +39,21 @@ class CommandLoopReq(Req):
     - It handles standard command setup/cleanup and updates command tracking variables.
     '''
 
+class PrefixKeymapReq(Req):
+
+    '''The command loop must support prefix keymaps.
+    - If a key sequence resolves to a sub-keymap (prefix keymap), the command loop must read the subsequent character and look it up recursively in that sub-keymap.
+    '''
+
+class KeySequenceTrackingReq(Req):
+    '''The engine must track the full multi-key sequence (e.g. `C-x C-f`) used to invoke the current command.
+    - `this-command-keys` must return the full sequence of keys pressed.
+    '''
+
+class KeymapRoutingUnitTestReq(Req):
+    '''The unit tests must verify multi-character key sequence routing, prefix keymaps, and correct tracking of `this-command-keys`.
+    '''
+
 class InteractiveCommandLoop(Feat):
     '''Interactive Command Loop and Keymap Routing feature grouping.'''
+
