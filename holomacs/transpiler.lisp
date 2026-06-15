@@ -69,19 +69,27 @@
                  (params (second args))
                  (body (cddr args))
                  (first-form (first body))
-                 (is-interactive (and (consp first-form) (eq (car first-form) 'interactive)))
+                 (is-interactive (and (consp first-form)
+                                      (string= (string-upcase (symbol-name (car first-form))) "INTERACTIVE")))
                  (interactive-spec (when is-interactive (cdr first-form)))
-                 (real-body (if is-interactive (rest body) body)))
-            `(progn
-               (defun ,name ,params
-                 (declare (special ,@params))
-                 ,@(mapcar #'transpile-elisp real-body))
-               ,(when is-interactive
-                  `(setf (get ',name 'interactive)
-                         ,(if (null interactive-spec)
-                              :user-interactive
-                              (first interactive-spec))))
-               ',name)))
+                 (real-body (if is-interactive (rest body) body))
+                 (name-str (symbol-name name))
+                 (defun-form `(setf (cl:symbol-function (intern ,name-str (find-package '#:holomacs)))
+                                    (lambda ,params
+                                      (declare (special ,@params))
+                                      ,@(mapcar #'transpile-elisp real-body)))))
+            (if is-interactive
+                `(progn
+                  ,defun-form
+                  (let ((sym (intern ,name-str (find-package '#:holomacs)))
+                        (val ,(if (null interactive-spec)
+                                  :user-interactive
+                                  (first interactive-spec))))
+                    (setf (get sym :interactive) val)
+                    sym))
+                `(progn
+                  ,defun-form
+                  (intern ,name-str (find-package '#:holomacs))))))
          (while
           `(loop while ,(transpile-elisp (first args))
                  do (progn ,@(mapcar #'transpile-elisp (rest args)))))
@@ -114,7 +122,8 @@
 (defun compile-elisp-form (expr)
   "Transpile and evaluate/compile a single Elisp form."
   (let ((cl-form (transpile-elisp expr)))
-    (eval cl-form)))
+    (let ((*package* (find-package '#:holomacs)))
+      (eval cl-form))))
 
 (defun load-elisp-file (filename)
   "Load, transpile, and compile/execute an Elisp file."

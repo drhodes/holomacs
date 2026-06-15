@@ -12,16 +12,29 @@
 
 (register-primitive 'this-command-keys #'this-command-keys)
 
+(defun get-interactive-prop (sym)
+  (let ((plist (symbol-plist sym))
+        (found-key nil)
+        (found-val nil))
+    (loop while plist
+          for key = (first plist)
+          for val = (second plist)
+          do (if (and (symbolp key)
+                      (string= (string-upcase (symbol-name key)) "INTERACTIVE"))
+                 (progn (setf found-key key
+                              found-val val)
+                        (return))
+                 (setf plist (cddr plist))))
+    (values found-key found-val)))
+
 (defun commandp (symbol)
-  (if (and (symbolp symbol)
-           (get symbol 'interactive))
-      (let ((spec (get symbol 'interactive)))
-        ;; Built-in commands store t; user defun commands store :user-interactive or a spec
-        (cond
-          ((eq spec t) t)
-          ((eq spec :user-interactive) (list 'interactive))
-          (t (list 'interactive spec))))
-      nil))
+  (multiple-value-bind (pkey spec) (and (symbolp symbol) (get-interactive-prop symbol))
+    (when pkey
+      ;; Built-in commands store t; user defun commands store :user-interactive or a spec
+      (cond
+        ((eq spec t) t)
+        ((eq spec :user-interactive) (list pkey))
+        (t (list pkey spec))))))
 
 (register-primitive 'commandp #'commandp)
 
@@ -45,17 +58,18 @@
 (defun self-insert-command ()
   (insert (char-to-string (char-code (aref *this-command-keys* 0)))))
 
-(setf (get 'self-insert-command 'interactive) t)
+(setf (get 'self-insert-command :interactive) t)
 (register-primitive 'self-insert-command #'self-insert-command)
 
 (defun command-execute (cmd &optional record)
   (declare (ignore record))
-  (setq this-command cmd)
-  (let ((func (if (symbolp cmd)
-                  (symbol-function cmd)
-                  cmd)))
-    (funcall func))
-  (setq last-command this-command)
+  (let ((prev this-command))
+    (setq this-command cmd)
+    (let ((func (if (symbolp cmd)
+                     (symbol-function cmd)
+                     cmd)))
+      (funcall func))
+    (setq last-command prev))
   nil)
 
 (register-primitive 'command-execute #'command-execute)
